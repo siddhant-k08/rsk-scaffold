@@ -1,3 +1,6 @@
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rsksmart/sk-scaffold/badge)](https://scorecard.dev/viewer/?uri=github.com/rsksmart/sk-scaffold)
+[![CodeQL](https://github.com/rsksmart/sk-scaffold/workflows/CodeQL/badge.svg)](https://github.com/rsksmart/sk-scaffold/actions?query=workflow%3ACodeQL)
+
 # 🏗 Scaffold-ETH-Rootstock
 
 <div align="center">
@@ -102,6 +105,26 @@ You can get testnet tRBTC from the [Rootstock Faucet](https://faucet.rootstock.i
 
 ## Documentation
 
-Visit our [Rootstock docs](https://docs.rootstock.io) to learn how to start building with Rootstock.
+Visit our [Rootstock docs](https://dev.rootstock.io) to learn how to start building with Rootstock.
+
+## Contributing
+
+We welcome contributions from the community. Please fork the repository and submit pull requests with your changes. Ensure your code adheres to the project's main objective.
+
+## Support
+
+For any questions or support, please open an issue on the repository or reach out to the maintainers.
+
+# Disclaimer
+
+The software provided in this GitHub repository is offered "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.
+
+- **Testing:** The software has not undergone testing of any kind, and its functionality, accuracy, reliability, and suitability for any purpose are not guaranteed.
+- **Use at Your Own Risk:** The user assumes all risks associated with the use of this software. The author(s) of this software shall not be held liable for any damages, including but not limited to direct, indirect, incidental, special, consequential, or punitive damages arising out of the use of or inability to use this software, even if advised of the possibility of such damages.
+- **No Liability:** The author(s) of this software are not liable for any loss or damage, including without limitation, any loss of profits, business interruption, loss of information or data, or other pecuniary loss arising out of the use of or inability to use this software.
+- **Sole Responsibility:** The user acknowledges that they are solely responsible for the outcome of the use of this software, including any decisions made or actions taken based on the software's output or functionality.
+- **No Endorsement:** Mention of any specific product, service, or organization does not constitute or imply endorsement by the author(s) of this software.
+- **Modification and Distribution:** This software may be modified and distributed under the terms of the license provided with the software. By modifying or distributing this software, you agree to be bound by the terms of the license.
+- **Assumption of Risk:** By using this software, the user acknowledges and agrees that they have read, understood, and accepted the terms of this disclaimer and assumes all risks associated with the use of this software.
 
 To know more about Scaffold-ETH features, check out their [website](https://scaffoldeth.io).
