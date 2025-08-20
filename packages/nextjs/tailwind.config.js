@@ -30,6 +30,7 @@ module.exports = {
         success: "var(--success)",
 
         background: "var(--bg-primary)",
+        foreground: "var(--foreground)",
         primary: "var(--bg-primary)",
         secondary: "var(--bg-secondary)",
       },

@@ -28,6 +28,8 @@
 
   --border: #484848;
 
+  --foreground: #1c1c1c;
+
   background: var(--bg-primary);
 }
 
