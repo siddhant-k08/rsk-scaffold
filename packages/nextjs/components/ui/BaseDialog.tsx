@@ -21,11 +21,11 @@ function BaseDialog({ children, closeDialog, className, open, disableClose }: Pr
   if (!mounted || !open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 w-screen h-screen bg-black/80 z-50 flex justify-center items-center">
+    <div className="fixed inset-0 w-screen h-screen bg-black/90 z-50 flex justify-center items-center">
       <div className={cn("bg-secondary p-6 rounded-lg shadow-lg relative", className)}>
         <button
           className={cn(
-            "absolute w-[20px] right-6 text-[20px] font-semibold top-4 cursor-pointer",
+            "absolute w-[20px] right-2 text-[20px] font-semibold top-4 cursor-pointer",
             disableClose && "opacity-50",
           )}
           onClick={() => closeDialog()}

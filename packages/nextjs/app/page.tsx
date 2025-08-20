@@ -3,6 +3,7 @@
 import type { NextPage } from "next";
 import CubeImg from "~~/components/assets/CubeImg";
 import CardContainer from "~~/components/home/CardContainer";
+import Title from "~~/components/home/Title";
 import Badge from "~~/components/ui/Badge";
 
 const Home: NextPage = () => {
@@ -11,11 +12,7 @@ const Home: NextPage = () => {
       <div className="mt-10 max-w-screen-lg xl:max-w-screen-xl mx-auto">
         <div className="px-5 flex justify-between items-start">
           <div>
-            <h1 className="flex font-bold text-[64px] gap-2 text-black">
-              <span className="bg-white p-1">Scaffold</span>
-              <span className="bg-brand-green p-1"> ETH</span>
-              <span className="bg-brand-orange p-1">Rootstock</span>
-            </h1>
+            <Title />
             <div className="flex gap-2 flex-col mt-16">
               <div className="flex gap-2">
                 <Badge type="number">1</Badge>

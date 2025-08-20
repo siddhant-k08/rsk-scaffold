@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { AddressQRCodeModal } from "./AddressQRCodeModal";
 import { NetworkOptions } from "./NetworkOptions";
 import CopyToClipboard from "react-copy-to-clipboard";
 import { getAddress } from "viem";
@@ -36,7 +37,7 @@ export const AddressInfoDropdown = ({
   const checkSumAddress = getAddress(address);
 
   const [addressCopied, setAddressCopied] = useState(false);
-
+  const [openQrDialog, setOpenQrDialog] = useState(false);
   const [selectingNetwork, setSelectingNetwork] = useState(false);
   const dropdownRef = useRef<HTMLDetailsElement>(null);
   const closeDropdown = () => {
@@ -87,7 +88,11 @@ export const AddressInfoDropdown = ({
             )}
           </li>
           <li className={selectingNetwork ? "hidden" : ""}>
-            <label htmlFor="qrcode-modal" className="btn-sm !rounded-xl flex gap-3 py-3 items-center">
+            <label
+              htmlFor="qrcode-modal"
+              className="btn-sm !rounded-xl flex gap-3 py-3 items-center"
+              onClick={() => setOpenQrDialog(true)}
+            >
               <QrCodeIcon className="h-5 w-5" />
               <span className="">View QR Code</span>
             </label>
@@ -125,6 +130,7 @@ export const AddressInfoDropdown = ({
           </li>
         </ul>
       </details>
+      <AddressQRCodeModal address={address} open={openQrDialog} closeDialog={() => setOpenQrDialog(false)} />
     </>
   );
 };

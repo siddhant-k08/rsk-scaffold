@@ -6,12 +6,13 @@ type BadgeProps = {
   type?: "number" | "text" | "code";
 };
 
+const TYPE_BADGE = {
+  number: "w-5",
+  text: "w-max px-2",
+  code: "bg-btn-secondary px-2 w-max text-sm text-white font-normal",
+};
+
 function Badge({ children, type = "text" }: BadgeProps) {
-  const TYPE_BADGE = {
-    number: "w-5",
-    text: "w-max px-2",
-    code: "bg-btn-secondary px-2 w-max text-sm text-white font-normal",
-  };
   return (
     <div
       className={cn(
