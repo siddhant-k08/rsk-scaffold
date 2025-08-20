@@ -4,11 +4,36 @@
 
 :root,
 [data-theme] {
-  background: oklch(var(--b2));
+  --bg-primary: #000;
+  --bg-secondary: #131313;
+  --gray-700: #3a3a3a;
+  --gray-600: #2a2a2a;
+  --gray-500: #515151;
+
+  --btn-secondary: #262626;
+
+  --brand-purple: #9e76ff;
+  --brand-green: #79c600;
+  --brand-pink: #ff71e1;
+  --brand-pink-dark: #ab4b96;
+  --brand-orange: #ff9100;
+  --brand-cyan: #08ffd0;
+  --brand-yellow: #713f12;
+  --brand-lime: #deff1a;
+  --brand-red: #ff2323;
+
+  --white-100: #fbfbfb;
+  --white-200: #cccccc;
+  --white-400: #b8b8b8;
+
+  --border: #484848;
+
+  background: var(--bg-primary);
 }
 
 body {
   min-height: 100vh;
+  color: var(--white-100);
 }
 
 h1,

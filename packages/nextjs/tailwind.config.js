@@ -2,81 +2,37 @@
 module.exports = {
   content: ["./app/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}", "./utils/**/*.{js,ts,jsx,tsx}"],
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  plugins: [require("daisyui")],
-  darkTheme: "dark",
-  darkMode: ["selector", "[data-theme='dark']"],
-  // DaisyUI theme colors
-  daisyui: {
-    themes: [
-      {
-        light: {
-          primary: "#200052",
-          "primary-content": "#F9FBFF",
-          secondary: "#836EF9",
-          "secondary-content": "#F9FBFF",
-          accent: "#4969A6",
-          "accent-content": "#F9FBFF",
-          neutral: "#F9FBFF",
-          "neutral-content": "#836EF9",
-          "base-100": "#836EF9",
-          "base-200": "#200052",
-          "base-300": "#200052",
-          "base-content": "#F9FBFF",
-          info: "#A0055D",
-          success: "#34EEB6",
-          warning: "#FFCF72",
-          error: "#FF8863",
-
-          "--rounded-btn": "9999rem",
-
-          ".tooltip": {
-            "--tooltip-tail": "6px",
-          },
-          ".link": {
-            textUnderlineOffset: "2px",
-          },
-          ".link:hover": {
-            opacity: "80%",
-          },
-        },
-      },
-      {
-        dark: {
-          primary: "#200052",
-          "primary-content": "#FFFFFF",
-          secondary: "#FFA500",
-          "secondary-content": "#F9FBFF",
-          accent: "#FFFFFF",
-          "accent-content": "#F9FBFF",
-          neutral: "#F9FBFF",
-          "neutral-content": "#FFA500",
-          "base-100": "#FFA500",
-          "base-200": "#000000",
-          "base-300": "#FFA500",
-          "base-content": "#FFFFFF",
-          info: "#A0055D",
-          success: "#34EEB6",
-          warning: "#FFCF72",
-          error: "#FF8863",
-
-          "--rounded-btn": "9999rem",
-
-          ".tooltip": {
-            "--tooltip-tail": "6px",
-            "--tooltip-color": "oklch(var(--p))",
-          },
-          ".link": {
-            textUnderlineOffset: "2px",
-          },
-          ".link:hover": {
-            opacity: "80%",
-          },
-        },
-      },
-    ],
-  },
+  plugins: [],
   theme: {
     extend: {
+      colors: {
+        "gray-700": "var(--gray-700)",
+        "gray-500": "var(--gray-500)",
+        "gray-600": "var(--gray-600)",
+
+        "brand-purple": "var(--brand-purple)",
+        "brand-green": "var(--brand-green)",
+        "brand-pink": "var(--brand-pink)",
+        "brand-pink-dark": "var(--brand-pink-dark)",
+        "brand-orange": "var(--brand-orange)",
+        "brand-cyan": "var(--brand-cyan)",
+        "brand-yellow": "var(--brand-yellow)",
+        "brand-lime": "var(--brand-lime)",
+        "brand-red": "var(--brand-red)",
+        highlighted: "var(--highlighted)",
+        "dark-brown": "var(--dark-brown)",
+        border: "var(--border)",
+
+        "white-100": "var(--white-100)",
+        "white-200": "var(--white-200)",
+        "white-400": "var(--white-400)",
+        "btn-secondary": "var(--btn-secondary)",
+        success: "var(--success)",
+
+        background: "var(--bg-primary)",
+        primary: "var(--bg-primary)",
+        secondary: "var(--bg-secondary)",
+      },
       boxShadow: {
         center: "0 0 12px -2px rgb(0 0 0 / 0.05)",
       },

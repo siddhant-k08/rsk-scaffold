@@ -1,87 +1,40 @@
 "use client";
 
-import Link from "next/link";
 import type { NextPage } from "next";
-import { useAccount } from "wagmi";
-import { BoltIcon, BookOpenIcon, BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Address } from "~~/components/scaffold-eth";
+import CubeImg from "~~/components/assets/CubeImg";
+import CardContainer from "~~/components/home/CardContainer";
+import Badge from "~~/components/ui/Badge";
 
 const Home: NextPage = () => {
-  const { address: connectedAddress } = useAccount();
-
   return (
     <>
-      <div className="flex items-center flex-col flex-grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH-Rootstock</span>
-          </h1>
-          <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row">
-            <p className="my-2 font-medium">Connected Address:</p>
-            <Address address={connectedAddress} />
-          </div>
-          <p className="text-center text-lg">
-            Get started by editing{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/nextjs/app/page.tsx
-            </code>
-          </p>
-          <p className="text-center text-lg">
-            Edit your smart contract{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              YourContract.sol
-            </code>{" "}
-            in{" "}
-            <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-              packages/hardhat/contracts
-            </code>
-          </p>
-        </div>
-
-        <div className="flex-grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
-            <div className="flex flex-col bg-base-200 border-base-100 border-2 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BoltIcon className="h-8 w-8" />
-              <p>
-                Get testnet funds from the{" "}
-                <Link href="https://faucet.rootstock.io/" passHref className="link">
-                  {/* TODO: Add Faucet link here */}Faucet
-                </Link>{" "}
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-200 border-base-100 border-2 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contracts
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-200 border-base-100 border-2 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8" />
-              <p>
-                Explore your transactions with the{" "}
-                <Link href="https://explorer.testnet.rootstock.io/" passHref className="link" target="_blank">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
-            <div className="flex flex-col bg-base-200 border-base-100 border-2 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BookOpenIcon className="h-8 w-8" />
-              <p>
-                Learn more about{" "}
-                <Link href="https://dev.rootstock.io/" passHref className="link" target="_blank">
-                  Rootstock
-                </Link>
-                .
-              </p>
+      <div className="mt-10 max-w-screen-lg xl:max-w-screen-xl mx-auto">
+        <div className="px-5 flex justify-between items-start">
+          <div>
+            <h1 className="flex font-bold text-[64px] gap-2 text-black">
+              <span className="bg-white p-1">Scaffold</span>
+              <span className="bg-brand-green p-1"> ETH</span>
+              <span className="bg-brand-orange p-1">Rootstock</span>
+            </h1>
+            <div className="flex gap-2 flex-col mt-16">
+              <div className="flex gap-2">
+                <Badge type="number">1</Badge>
+                <Badge>Get Started</Badge>
+              </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1">
+                  Get started by editing <Badge type="code">packages/nextjs/app/page.tsx</Badge>
+                </div>
+                <div className="flex items-center gap-1">
+                  Edit your smart contract <Badge type="code">YourContract.sol</Badge> in
+                  <Badge type="code">packages/hardhat/contracts</Badge>
+                </div>
+              </div>
             </div>
           </div>
+          <CubeImg />
         </div>
+        <CardContainer />
       </div>
     </>
   );
