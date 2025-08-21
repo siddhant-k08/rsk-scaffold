@@ -1,7 +1,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rsksmart/rsk-scaffold/badge)](https://scorecard.dev/viewer/?uri=github.com/rsksmart/rsk-scaffold)
 [![CodeQL](https://github.com/rsksmart/rsk-scaffold/workflows/CodeQL/badge.svg)](https://github.com/rsksmart/rsk-scaffold/actions?query=workflow%3ACodeQL)
 
-# 🏗 Scaffold-ETH-Rootstock
+# 🏗 Rootstock-Scaffold
 
 <div align="center">
 <img src="packages/nextjs/public/rootstock.svg" width="200" />
@@ -37,13 +37,13 @@ To get started, follow the steps below:
 1. Clone this repo & install dependencies
 
 ```sh
-git clone https://github.com/siddhant-k08/scaffold-eth-rootstock.git
+git clone https://github.com/rsksmart/rsk-scaffold.git
 ```
 
 2. Open the project directory and install dependencies
 
 ```sh
-cd scaffold-eth-rootstock && yarn install
+cd rsk-scaffold && yarn install
 ```
 
 3. Setup `.env` file for Hardhat:
