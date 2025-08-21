@@ -38,10 +38,14 @@
   },
   "packageManager": "yarn@3.2.3",
   "devDependencies": {
+    "@types/react-dom": "^19.1.7",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10"
   },
   "engines": {
     "node": ">=18.18.0"
+  },
+  "dependencies": {
+    "tailwind-merge": "^3.3.1"
   }
 }

@@ -88,15 +88,15 @@ export const WriteOnlyFunctionForm = ({
   const zeroInputs = inputs.length === 0 && abiFunction.stateMutability !== "payable";
 
   return (
-    <div className="py-5 space-y-3 first:pt-0 last:pb-1">
-      <div className={`flex gap-3 ${zeroInputs ? "flex-row justify-between items-center" : "flex-col"}`}>
-        <p className="font-medium my-0 break-words">
+    <div className="mt-2 mb-3 border border-border rounded-xl">
+      <div className={`flex gap-3 flex-col`}>
+        <p className="font-medium my-0 break-words bg-btn-secondary rounded-t-xl px-2 py-1">
           {abiFunction.name}
           <InheritanceTooltip inheritedFrom={inheritedFrom} />
         </p>
-        {inputs}
+        <div className="px-3">{inputs}</div>
         {abiFunction.stateMutability === "payable" ? (
-          <div className="flex flex-col gap-1.5 w-full">
+          <div className="flex flex-col gap-1.5 w-full px-3">
             <div className="flex items-center ml-2">
               <span className="text-xs font-medium mr-2 leading-none">payable value</span>
               <span className="block text-xs font-extralight leading-none">wei</span>
@@ -111,28 +111,32 @@ export const WriteOnlyFunctionForm = ({
             />
           </div>
         ) : null}
-        <div className="flex justify-between gap-2">
+        <div className="flex flex-col gap-2 px-3 pb-3">
+          <div
+            className={`flex ${
+              writeDisabled &&
+              " flex-col-reverse text-xs text-white-400 tooltip before:content-[attr(data-tip)] before:right-[-10px] before:left-auto before:transform-none"
+            }`}
+            data-tip={`${writeDisabled && "Wallet not connected or in the wrong network"}`}
+          >
+            <button
+              className="bg-brand-pink rounded-md py-1 px-2 text-black text-xs w-min mb-1"
+              disabled={writeDisabled || isPending}
+              onClick={handleWrite}
+            >
+              {isPending && <span className="loading loading-spinner loading-xs"></span>}
+              Send
+            </button>
+          </div>
           {!zeroInputs && (
             <div className="flex-grow basis-0">
               {displayedTxResult ? <TxReceipt txResult={displayedTxResult} /> : null}
             </div>
           )}
-          <div
-            className={`flex ${
-              writeDisabled &&
-              "tooltip before:content-[attr(data-tip)] before:right-[-10px] before:left-auto before:transform-none"
-            }`}
-            data-tip={`${writeDisabled && "Wallet not connected or in the wrong network"}`}
-          >
-            <button className="btn btn-secondary btn-sm" disabled={writeDisabled || isPending} onClick={handleWrite}>
-              {isPending && <span className="loading loading-spinner loading-xs"></span>}
-              Send 💸
-            </button>
-          </div>
         </div>
       </div>
       {zeroInputs && txResult ? (
-        <div className="flex-grow basis-0">
+        <div className="">
           <TxReceipt txResult={txResult} />
         </div>
       ) : null}

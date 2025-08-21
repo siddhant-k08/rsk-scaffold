@@ -1,33 +1,22 @@
 import { QRCodeSVG } from "qrcode.react";
 import { Address as AddressType } from "viem";
 import { Address } from "~~/components/scaffold-eth";
+import BaseDialog from "~~/components/ui/BaseDialog";
 
 type AddressQRCodeModalProps = {
   address: AddressType;
-  modalId: string;
+  modalId?: string;
+  open: boolean;
+  closeDialog: () => void;
 };
 
-export const AddressQRCodeModal = ({ address, modalId }: AddressQRCodeModalProps) => {
+export const AddressQRCodeModal = ({ address, open, closeDialog }: AddressQRCodeModalProps) => {
   return (
-    <>
-      <div>
-        <input type="checkbox" id={`${modalId}`} className="modal-toggle" />
-        <label htmlFor={`${modalId}`} className="modal cursor-pointer">
-          <label className="modal-box relative">
-            {/* dummy input to capture event onclick on modal box */}
-            <input className="h-0 w-0 absolute top-0 left-0" />
-            <label htmlFor={`${modalId}`} className="btn btn-ghost btn-sm btn-circle absolute right-3 top-3">
-              ✕
-            </label>
-            <div className="space-y-3 py-6">
-              <div className="flex flex-col items-center gap-6">
-                <QRCodeSVG value={address} size={256} />
-                <Address address={address} format="long" disableAddressLink onlyEnsOrAddress />
-              </div>
-            </div>
-          </label>
-        </label>
+    <BaseDialog open={open} closeDialog={closeDialog} className="border border-border">
+      <div className="flex flex-col items-center md:gap-8 gap-4 p-4">
+        <QRCodeSVG value={address} size={256} />
+        <Address address={address} format="long" disableAddressLink onlyEnsOrAddress />
       </div>
-    </>
+    </BaseDialog>
   );
 };
