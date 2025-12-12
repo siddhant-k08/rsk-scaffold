@@ -11,8 +11,7 @@ import "hardhat-deploy";
 import "hardhat-deploy-ethers";
 
 // If not set, it uses the hardhat account 0 private key.
-const deployerPrivateKey =
-  process.env.DEPLOYER_PRIVATE_KEY;
+const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
 // forking rpc url
 const forkingURL = process.env.FORKING_URL || "";
@@ -35,7 +34,7 @@ const config: HardhatUserConfig = {
       },
     ],
   },
-  defaultNetwork: "rootstockTestnet",
+  defaultNetwork: "localhost",
   namedAccounts: {
     deployer: {
       // By default, it will take the first Hardhat account as the deployer
@@ -50,6 +49,9 @@ const config: HardhatUserConfig = {
         url: forkingURL,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
+    },
+    localhost: {
+      url: "http://127.0.0.1:8545",
     },
     rootstockTestnet: {
       url: rootstockRpcUrl,
