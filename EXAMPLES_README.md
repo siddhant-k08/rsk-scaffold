@@ -73,25 +73,75 @@ A minimal decentralized governance system.
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Configure Environment Variables
+
+Before deploying, you need to set up environment variables for both Hardhat and NextJS.
+
+#### Hardhat Environment Variables
+
+Copy the example file and fill in the required values:
+
+```bash
+cp packages/hardhat/.env.example packages/hardhat/.env
+```
+
+Edit `packages/hardhat/.env` and set:
+
+- **`DEPLOYER_PRIVATE_KEY`** (REQUIRED): Private key for deploying contracts
+  - For local development: Use a test private key
+  - Generate one with: `yarn generate`
+  - ⚠️ **NEVER commit real private keys to version control**
+
+- **`ROOTSTOCK_RPC_URL`** (REQUIRED): RPC endpoint for Rootstock network
+  - Testnet: `https://rpc.testnet.rootstock.io/YOUR_API_KEY_HERE`
+  - Mainnet: `https://rpc.mainnet.rootstock.io/YOUR_API_KEY_HERE`
+  - Get API key from: https://rpc.rootstock.io/
+  - Or use public endpoint: `https://public-node.testnet.rsk.co` (rate limited)
+
+#### NextJS Environment Variables
+
+Copy the example file and fill in the required values:
+
+```bash
+cp packages/nextjs/.env.example packages/nextjs/.env.local
+```
+
+Edit `packages/nextjs/.env.local` and set:
+
+- **`NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`** (REQUIRED): For wallet connections
+  - Get your project ID from: https://cloud.walletconnect.com
+  - Default provided in `scaffold.config.ts` for development
+
+- **`NEXT_PUBLIC_ROOTSTOCK_RPC_URL`** (REQUIRED): RPC endpoint for frontend
+  - Same as Hardhat RPC URL
+  - Must be prefixed with `NEXT_PUBLIC_` to be accessible in the browser
+
+### 2. Install Dependencies
 
 ```bash
 yarn install
 ```
 
-### 2. Start Local Blockchain
+### 3. Start Local Blockchain (Optional)
+
+For local development:
 
 ```bash
 yarn chain
 ```
 
-### 3. Deploy Contracts
+Or skip this step to deploy directly to Rootstock Testnet.
+
+### 4. Deploy Contracts
 
 In a new terminal:
 
 ```bash
-# Deploy all example contracts
+# Deploy all example contracts to localhost
 yarn deploy --tags examples
+
+# Or deploy to Rootstock Testnet
+yarn deploy --tags examples --network rootstockTestnet
 
 # Or deploy individually
 yarn deploy --tags ExampleToken
@@ -99,13 +149,13 @@ yarn deploy --tags SimpleNFT
 yarn deploy --tags SimpleDAO
 ```
 
-### 4. Start Frontend
+### 5. Start Frontend
 
 ```bash
 yarn start
 ```
 
-### 5. Access Examples
+### 6. Access Examples
 
 Navigate to:
 - **Examples Index**: http://localhost:3000/examples
