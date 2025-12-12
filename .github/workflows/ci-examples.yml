@@ -1,0 +1,136 @@
+name: CI Examples
+
+on:
+  push:
+    branches:
+      - main
+      - examples/**
+    paths:
+      - "packages/hardhat/contracts/examples/**"
+      - "packages/hardhat/test/examples/**"
+      - "packages/hardhat/deploy/*_example_*.ts"
+      - "packages/hardhat/deploy/*_simple_*.ts"
+      - "packages/nextjs/app/examples/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "packages/hardhat/contracts/examples/**"
+      - "packages/hardhat/test/examples/**"
+      - "packages/hardhat/deploy/*_example_*.ts"
+      - "packages/hardhat/deploy/*_simple_*.ts"
+      - "packages/nextjs/app/examples/**"
+
+jobs:
+  test-contracts:
+    name: Test Example Contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Compile contracts
+        run: yarn compile
+
+      - name: Run example contract tests
+        run: yarn hardhat test test/examples/*.ts --network hardhat
+        working-directory: packages/hardhat
+
+  lint-contracts:
+    name: Lint Example Contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint Solidity files
+        run: yarn hardhat:lint
+        continue-on-error: true
+
+      - name: Check TypeScript types
+        run: yarn hardhat:check-types
+        working-directory: packages/hardhat
+
+  build-frontend:
+    name: Build Frontend with Examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Compile contracts
+        run: yarn compile
+
+      - name: Check Next.js types
+        run: yarn next:check-types
+
+      - name: Build Next.js
+        run: yarn next:build
+        env:
+          NEXT_PUBLIC_IGNORE_BUILD_ERROR: "false"
+
+  deploy-test:
+    name: Test Example Deployments
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Compile contracts
+        run: yarn compile
+
+      - name: Test deployment scripts
+        run: |
+          # Start local node in background
+          yarn chain &
+          CHAIN_PID=$!
+          
+          # Wait for node to be ready
+          sleep 10
+          
+          # Deploy example contracts
+          yarn deploy --tags examples --network localhost || exit 1
+          
+          # Kill the local node
+          kill $CHAIN_PID
+        working-directory: packages/hardhat
