@@ -3,17 +3,99 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { Address, AddressInput } from "~~/components/scaffold-eth";
+import { AddressInput } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+
+const ProposalCard = ({ proposalId }: { proposalId: bigint }) => {
+  const { data: proposal } = useScaffoldReadContract({
+    contractName: "SimpleDAO",
+    functionName: "getProposal",
+    args: [proposalId],
+  });
+
+  const { writeContractAsync: writeSimpleDAOAsync } = useScaffoldWriteContract("SimpleDAO");
+
+  const handleVote = async (support: boolean) => {
+    try {
+      await writeSimpleDAOAsync({
+        functionName: "vote",
+        args: [proposalId, support],
+      });
+    } catch (error) {
+      console.error("Voting failed:", error);
+    }
+  };
+
+  const handleExecute = async () => {
+    try {
+      await writeSimpleDAOAsync({
+        functionName: "execute",
+        args: [proposalId],
+      });
+    } catch (error) {
+      console.error("Execution failed:", error);
+    }
+  };
+
+  if (!proposal)
+    return (
+      <div className="animate-pulse flex space-x-4">
+        <div className="h-4 bg-slate-200 rounded w-full"></div>
+      </div>
+    );
+
+  const [description, votesFor, votesAgainst, executed] = proposal;
+
+  return (
+    <div className="card bg-base-100 shadow-xl mb-4 border border-base-300">
+      <div className="card-body">
+        <div className="flex justify-between items-start">
+          <h3 className="card-title">Proposal #{proposalId.toString()}</h3>
+          {executed ? (
+            <div className="badge badge-success">Executed</div>
+          ) : (
+            <div className="badge badge-warning">Active</div>
+          )}
+        </div>
+
+        <p className="text-lg my-2">{description}</p>
+
+        <div className="grid grid-cols-2 gap-4 my-2">
+          <div className="bg-base-200 p-3 rounded-box text-center">
+            <div className="text-success font-bold text-xl">{votesFor.toString()}</div>
+            <div className="text-sm opacity-70">Votes For</div>
+          </div>
+          <div className="bg-base-200 p-3 rounded-box text-center">
+            <div className="text-error font-bold text-xl">{votesAgainst.toString()}</div>
+            <div className="text-sm opacity-70">Votes Against</div>
+          </div>
+        </div>
+
+        <div className="card-actions justify-end mt-4">
+          {!executed && (
+            <>
+              <button className="btn btn-success btn-sm" onClick={() => handleVote(true)}>
+                Vote For
+              </button>
+              <button className="btn btn-error btn-sm" onClick={() => handleVote(false)}>
+                Vote Against
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleExecute}>
+                Execute
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const DAOVote: NextPage = () => {
   const { address: connectedAddress } = useAccount();
   const [userAddress, setUserAddress] = useState("");
   const [votingPower, setVotingPower] = useState("");
   const [proposalDescription, setProposalDescription] = useState("");
-  const [proposalIdToView, setProposalIdToView] = useState("");
-  const [proposalIdToVote, setProposalIdToVote] = useState("");
-  const [voteSupport, setVoteSupport] = useState(true);
 
   // Read DAO info
   const { data: owner } = useScaffoldReadContract({
@@ -30,13 +112,6 @@ const DAOVote: NextPage = () => {
     contractName: "SimpleDAO",
     functionName: "votingPower",
     args: [connectedAddress],
-  });
-
-  // Read specific proposal
-  const { data: proposalData } = useScaffoldReadContract({
-    contractName: "SimpleDAO",
-    functionName: "getProposal",
-    args: proposalIdToView ? [BigInt(proposalIdToView)] : undefined,
   });
 
   // Write contract
@@ -79,310 +154,96 @@ const DAOVote: NextPage = () => {
     }
   };
 
-  const handleVote = async () => {
-    if (!proposalIdToVote) {
-      alert("Please enter proposal ID");
-      return;
-    }
-
-    try {
-      await writeSimpleDAOAsync({
-        functionName: "vote",
-        args: [BigInt(proposalIdToVote), voteSupport],
-      });
-    } catch (error) {
-      console.error("Voting failed:", error);
-    }
-  };
-
-  const handleExecute = async () => {
-    if (!proposalIdToView) {
-      alert("Please enter proposal ID to execute");
-      return;
-    }
-
-    try {
-      await writeSimpleDAOAsync({
-        functionName: "execute",
-        args: [BigInt(proposalIdToView)],
-      });
-    } catch (error) {
-      console.error("Execution failed:", error);
-    }
-  };
-
   return (
     <div className="flex items-center flex-col flex-grow pt-10">
-      <div className="px-5 w-full max-w-6xl">
+      <div className="px-5 w-full max-w-4xl">
         <h1 className="text-center mb-8">
-          <span className="block text-4xl font-bold">DAO Voting dApp</span>
-          <span className="block text-2xl mt-2">Decentralized Governance</span>
+          <span className="block text-4xl font-bold">DAO Governance</span>
+          <span className="block text-xl mt-2">Vote on proposals and manage the organization</span>
         </h1>
 
-        <div className="flex flex-col gap-6">
-          {/* DAO Info Card */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">DAO Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm opacity-70">Owner</p>
-                  <Address address={owner} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="flex flex-col gap-6">
+            {/* User Info */}
+            <div className="card bg-base-100 shadow-xl">
+              <div className="card-body">
+                <h2 className="card-title">Your Status</h2>
+                <div className="flex items-center justify-between">
+                  <span>Voting Power:</span>
+                  <span className="text-2xl font-bold">{myVotingPower?.toString() || "0"}</span>
                 </div>
-                <div>
-                  <p className="text-sm opacity-70">Total Proposals</p>
-                  <p className="text-2xl font-bold">{proposalCount?.toString() || "0"}</p>
-                </div>
-                <div>
-                  <p className="text-sm opacity-70">Your Voting Power</p>
-                  <p className="text-2xl font-bold">{myVotingPower?.toString() || "0"}</p>
-                </div>
+                {isOwner && <div className="badge badge-primary mt-2">Owner</div>}
               </div>
-              {isOwner && (
-                <div className="alert alert-warning mt-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="stroke-current shrink-0 h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                  <span>You are the DAO owner</span>
-                </div>
-              )}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Owner Controls */}
-            {isOwner && (
-              <div className="card bg-base-100 shadow-xl">
-                <div className="card-body">
-                  <h2 className="card-title">Owner: Set Voting Power</h2>
-
-                  <div className="form-control w-full">
-                    <label className="label">
-                      <span className="label-text">User Address</span>
-                    </label>
-                    <AddressInput value={userAddress} onChange={setUserAddress} placeholder="Enter user address" />
-                  </div>
-
-                  <div className="form-control w-full">
-                    <label className="label">
-                      <span className="label-text">Voting Power</span>
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="100"
-                      className="input input-bordered w-full"
-                      value={votingPower}
-                      onChange={e => setVotingPower(e.target.value)}
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="card-actions justify-end mt-4">
-                    <button className="btn btn-primary" onClick={handleSetVotingPower}>
-                      Set Voting Power
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Create Proposal */}
             <div className="card bg-base-100 shadow-xl">
               <div className="card-body">
                 <h2 className="card-title">Create Proposal</h2>
-
-                <div className="form-control w-full">
+                <div className="form-control">
                   <label className="label">
-                    <span className="label-text">Proposal Description</span>
+                    <span className="label-text">Description</span>
                   </label>
                   <textarea
                     className="textarea textarea-bordered h-24"
-                    placeholder="Describe your proposal..."
+                    placeholder="Proposal description..."
                     value={proposalDescription}
                     onChange={e => setProposalDescription(e.target.value)}
                   ></textarea>
                 </div>
-
                 <div className="card-actions justify-end mt-4">
-                  <button className="btn btn-primary" onClick={handleCreateProposal} disabled={!connectedAddress}>
-                    Create Proposal
+                  <button className="btn btn-primary" onClick={handleCreateProposal}>
+                    Propose
                   </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Vote on Proposal */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">Vote on Proposal</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text">Proposal ID</span>
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    className="input input-bordered w-full"
-                    value={proposalIdToVote}
-                    onChange={e => setProposalIdToVote(e.target.value)}
-                    min="0"
-                  />
-                </div>
-
-                <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text">Your Vote</span>
-                  </label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={voteSupport ? "for" : "against"}
-                    onChange={e => setVoteSupport(e.target.value === "for")}
-                  >
-                    <option value="for">Vote For</option>
-                    <option value="against">Vote Against</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="card-actions justify-end mt-4">
-                <button
-                  className="btn btn-primary"
-                  onClick={handleVote}
-                  disabled={!connectedAddress || !myVotingPower || myVotingPower === 0n}
-                >
-                  Cast Vote
-                </button>
-              </div>
-
-              {myVotingPower === 0n && connectedAddress && (
-                <div className="alert alert-warning mt-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="stroke-current shrink-0 h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            {/* Admin Panel */}
+            {isOwner && (
+              <div className="card bg-base-100 shadow-xl">
+                <div className="card-body">
+                  <h2 className="card-title">Admin: Set Voting Power</h2>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text">User Address</span>
+                    </label>
+                    <AddressInput value={userAddress} onChange={setUserAddress} placeholder="0x..." />
+                  </div>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text">Voting Power Amount</span>
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="100"
+                      className="input input-bordered"
+                      value={votingPower}
+                      onChange={e => setVotingPower(e.target.value)}
                     />
-                  </svg>
-                  <span>You have no voting power. Contact the DAO owner to receive voting power.</span>
+                  </div>
+                  <div className="card-actions justify-end mt-4">
+                    <button className="btn btn-secondary" onClick={handleSetVotingPower}>
+                      Set Power
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* View Proposal */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">View Proposal</h2>
-
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text">Proposal ID</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  className="input input-bordered w-full"
-                  value={proposalIdToView}
-                  onChange={e => setProposalIdToView(e.target.value)}
-                  min="0"
-                />
-              </div>
-
-              {proposalData && (
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-sm opacity-70">Description</p>
-                    <p className="text-lg font-semibold">{proposalData[0]}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm opacity-70">Votes For</p>
-                      <p className="text-2xl font-bold text-success">{proposalData[1]?.toString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm opacity-70">Votes Against</p>
-                      <p className="text-2xl font-bold text-error">{proposalData[2]?.toString()}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-sm opacity-70">Status</p>
-                    <div className="badge badge-lg mt-1">{proposalData[3] ? "Executed ✓" : "Pending"}</div>
-                  </div>
-
-                  {!proposalData[3] && proposalData[1] > proposalData[2] && (
-                    <div className="card-actions justify-end">
-                      <button className="btn btn-success" onClick={handleExecute}>
-                        Execute Proposal
-                      </button>
-                    </div>
-                  )}
-                </div>
+          <div className="flex flex-col gap-6">
+            {/* Proposals List */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Proposals ({proposalCount?.toString() || "0"})</h2>
+              {proposalCount && Number(proposalCount) > 0 ? (
+                // Reverse the array to show newest first
+                [...Array(Number(proposalCount))].map((_, index) => (
+                  <ProposalCard key={index} proposalId={BigInt(Number(proposalCount) - 1 - index)} />
+                ))
+              ) : (
+                <div className="text-center opacity-50">No proposals yet</div>
               )}
-            </div>
-          </div>
-
-          {/* Tutorial Card */}
-          <div className="card bg-base-200 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">How to Use</h2>
-              <ol className="list-decimal list-inside space-y-2">
-                <li>
-                  <strong>Owner:</strong> Set voting power for users (only the DAO owner can do this)
-                </li>
-                <li>
-                  <strong>Anyone:</strong> Create proposals by entering a description
-                </li>
-                <li>
-                  <strong>Voters:</strong> Vote on proposals using your voting power (you can only vote once per
-                  proposal)
-                </li>
-                <li>
-                  <strong>View:</strong> Check proposal details by entering the proposal ID
-                </li>
-                <li>
-                  <strong>Execute:</strong> Execute proposals that have more votes for than against
-                </li>
-              </ol>
-              <div className="alert alert-info mt-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="stroke-current shrink-0 w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  ></path>
-                </svg>
-                <span>
-                  This is a minimal DAO contract demonstrating basic governance. In production, you would add time
-                  locks, quorum requirements, and more sophisticated voting mechanisms.
-                </span>
-              </div>
             </div>
           </div>
         </div>

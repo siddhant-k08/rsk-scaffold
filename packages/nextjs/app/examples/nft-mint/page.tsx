@@ -4,23 +4,10 @@ import { useState } from "react";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldEventHistory, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
-const NFTMint: NextPage = () => {
+const NFTInfoCard = () => {
   const { address: connectedAddress } = useAccount();
-  const [mintToAddress, setMintToAddress] = useState("");
-  const [viewAddress, setViewAddress] = useState("");
-
-  // Read NFT info
-  const { data: nftName } = useScaffoldReadContract({
-    contractName: "SimpleNFT",
-    functionName: "name",
-  });
-
-  const { data: nftSymbol } = useScaffoldReadContract({
-    contractName: "SimpleNFT",
-    functionName: "symbol",
-  });
 
   const { data: totalSupply } = useScaffoldReadContract({
     contractName: "SimpleNFT",
@@ -32,14 +19,39 @@ const NFTMint: NextPage = () => {
     functionName: "nextId",
   });
 
-  // Read balance of specific address
   const { data: balanceOf } = useScaffoldReadContract({
     contractName: "SimpleNFT",
     functionName: "balanceOf",
-    args: [viewAddress || connectedAddress],
+    args: [connectedAddress],
   });
 
-  // Write contract
+  return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <h2 className="card-title">Collection Information</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-base-200 p-4 rounded-box">
+            <p className="text-sm opacity-70">Total Minted</p>
+            <p className="text-3xl font-bold">{totalSupply?.toString() || "0"}</p>
+          </div>
+          <div className="bg-base-200 p-4 rounded-box">
+            <p className="text-sm opacity-70">Next Token ID</p>
+            <p className="text-3xl font-bold">#{nextId?.toString() || "0"}</p>
+          </div>
+          <div className="bg-base-200 p-4 rounded-box col-span-2">
+            <p className="text-sm opacity-70">Your Balance</p>
+            <p className="text-3xl font-bold">{balanceOf?.toString() || "0"} NFTs</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MintCard = () => {
+  const { address: connectedAddress } = useAccount();
+  const [mintToAddress, setMintToAddress] = useState("");
+
   const { writeContractAsync: writeSimpleNFTAsync } = useScaffoldWriteContract("SimpleNFT");
 
   const handleMint = async () => {
@@ -61,6 +73,85 @@ const NFTMint: NextPage = () => {
   };
 
   return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <h2 className="card-title">Mint NFT</h2>
+
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Mint To Address (leave empty to mint to yourself)</span>
+          </label>
+          <AddressInput value={mintToAddress} onChange={setMintToAddress} placeholder="0x..." />
+        </div>
+
+        <div className="card-actions justify-end mt-4">
+          <button className="btn btn-primary" onClick={handleMint}>
+            Mint NFT
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RecentMintsCard = () => {
+  const { data: mintEvents, isLoading: isLoadingEvents } = useScaffoldEventHistory({
+    contractName: "SimpleNFT",
+    eventName: "NFTMinted",
+    fromBlock: 0n,
+    watch: true,
+  });
+
+  return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <h2 className="card-title mb-4">Recent Mints</h2>
+        <div className="overflow-x-auto">
+          {isLoadingEvents ? (
+            <div className="text-center py-4">Loading events...</div>
+          ) : !mintEvents || mintEvents.length === 0 ? (
+            <div className="text-center py-4 opacity-50">No mints yet</div>
+          ) : (
+            <table className="table table-zebra w-full">
+              <thead>
+                <tr>
+                  <th>Token ID</th>
+                  <th>To</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...mintEvents]
+                  .reverse()
+                  .slice(0, 10)
+                  .map((event, index) => (
+                    <tr key={index}>
+                      <td className="font-bold">#{event.args.tokenId?.toString()}</td>
+                      <td>
+                        <Address address={event.args.to} size="sm" />
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NFTMint: NextPage = () => {
+  const { data: nftName } = useScaffoldReadContract({
+    contractName: "SimpleNFT",
+    functionName: "name",
+  });
+
+  const { data: nftSymbol } = useScaffoldReadContract({
+    contractName: "SimpleNFT",
+    functionName: "symbol",
+  });
+
+  return (
     <div className="flex items-center flex-col flex-grow pt-10">
       <div className="px-5 w-full max-w-4xl">
         <h1 className="text-center mb-8">
@@ -70,126 +161,14 @@ const NFTMint: NextPage = () => {
           </span>
         </h1>
 
-        <div className="flex flex-col gap-6">
-          {/* NFT Collection Info Card */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">Collection Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm opacity-70">Total Minted</p>
-                  <p className="text-2xl font-bold">{totalSupply?.toString() || "0"} NFTs</p>
-                </div>
-                <div>
-                  <p className="text-sm opacity-70">Next Token ID</p>
-                  <p className="text-2xl font-bold">#{nextId?.toString() || "0"}</p>
-                </div>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="flex flex-col gap-6">
+            <NFTInfoCard />
+            <MintCard />
           </div>
 
-          {/* Mint Card */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">Mint NFT</h2>
-
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text">Mint To Address (leave empty to mint to yourself)</span>
-                </label>
-                <AddressInput
-                  value={mintToAddress}
-                  onChange={setMintToAddress}
-                  placeholder={connectedAddress || "Enter address or connect wallet"}
-                />
-              </div>
-
-              <div className="card-actions justify-end mt-4">
-                <button className="btn btn-primary" onClick={handleMint} disabled={!connectedAddress}>
-                  Mint NFT
-                </button>
-              </div>
-
-              {connectedAddress && (
-                <div className="alert alert-success mt-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="stroke-current shrink-0 h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span>
-                    Minting to:{" "}
-                    {mintToAddress || connectedAddress?.substring(0, 6) + "..." + connectedAddress?.substring(38)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* View NFTs Card */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">View NFT Balance</h2>
-
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text">Address to Check (leave empty to check your balance)</span>
-                </label>
-                <AddressInput
-                  value={viewAddress}
-                  onChange={setViewAddress}
-                  placeholder={connectedAddress || "Enter address"}
-                />
-              </div>
-
-              <div className="mt-4">
-                <p className="text-sm opacity-70">NFT Balance</p>
-                <p className="text-3xl font-bold">{balanceOf?.toString() || "0"} NFTs</p>
-                <p className="text-sm mt-2">
-                  Address: <Address address={viewAddress || connectedAddress} />
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Tutorial Card */}
-          <div className="card bg-base-200 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">How to Use</h2>
-              <ol className="list-decimal list-inside space-y-2">
-                <li>Connect your wallet using the button in the header</li>
-                <li>To mint to yourself: Leave the address field empty and click &quot;Mint NFT&quot;</li>
-                <li>To mint to another address: Enter the recipient address and click &quot;Mint NFT&quot;</li>
-                <li>View NFT balances by entering an address in the &quot;View NFT Balance&quot; section</li>
-                <li>Each minted NFT gets a unique, auto-incrementing token ID</li>
-              </ol>
-              <div className="alert alert-info mt-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="stroke-current shrink-0 w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  ></path>
-                </svg>
-                <span>
-                  This is a simple ERC-721 NFT contract. Anyone can mint NFTs with auto-incrementing token IDs.
-                </span>
-              </div>
-            </div>
+          <div className="flex flex-col gap-6">
+            <RecentMintsCard />
           </div>
         </div>
       </div>

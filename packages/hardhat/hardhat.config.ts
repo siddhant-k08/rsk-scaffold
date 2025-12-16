@@ -45,6 +45,7 @@ const config: HardhatUserConfig = {
     // View the networks that are pre-configured.
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
+      saveDeployments: true,
       forking: {
         url: forkingURL,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
@@ -52,10 +53,11 @@ const config: HardhatUserConfig = {
     },
     localhost: {
       url: "http://127.0.0.1:8545",
+      chainId: 31337,
     },
     rootstockTestnet: {
       url: rootstockRpcUrl,
-      accounts: [deployerPrivateKey],
+      accounts: deployerPrivateKey ? [deployerPrivateKey] : undefined,
       chainId: 31,
     },
   },

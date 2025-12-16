@@ -5,24 +5,15 @@ import type { NextPage } from "next";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount } from "wagmi";
 import { Address, AddressInput } from "~~/components/scaffold-eth";
-import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldEventHistory, useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
-const TokenTransfer: NextPage = () => {
+const TokenInfoCard = () => {
   const { address: connectedAddress } = useAccount();
-  const [recipientAddress, setRecipientAddress] = useState("");
-  const [amount, setAmount] = useState("");
 
-  // Read token balance
   const { data: balance } = useScaffoldReadContract({
     contractName: "ExampleToken",
     functionName: "balanceOf",
     args: [connectedAddress],
-  });
-
-  // Read token info
-  const { data: tokenName } = useScaffoldReadContract({
-    contractName: "ExampleToken",
-    functionName: "name",
   });
 
   const { data: tokenSymbol } = useScaffoldReadContract({
@@ -35,7 +26,38 @@ const TokenTransfer: NextPage = () => {
     functionName: "totalSupply",
   });
 
-  // Write contract
+  return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <h2 className="card-title">Token Information</h2>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-base-200 p-4 rounded-box flex justify-between items-center">
+            <span className="text-sm opacity-70">Total Supply</span>
+            <span className="text-xl font-bold">
+              {totalSupply ? formatUnits(totalSupply, 18) : "0"} {tokenSymbol}
+            </span>
+          </div>
+          <div className="bg-base-200 p-4 rounded-box flex justify-between items-center">
+            <span className="text-sm opacity-70">Your Balance</span>
+            <span className="text-xl font-bold">
+              {balance ? formatUnits(balance, 18) : "0"} {tokenSymbol}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TransferCard = () => {
+  const [recipientAddress, setRecipientAddress] = useState("");
+  const [amount, setAmount] = useState("");
+
+  const { data: tokenSymbol } = useScaffoldReadContract({
+    contractName: "ExampleToken",
+    functionName: "symbol",
+  });
+
   const { writeContractAsync: writeExampleTokenAsync } = useScaffoldWriteContract("ExampleToken");
 
   const handleTransfer = async () => {
@@ -58,6 +80,105 @@ const TokenTransfer: NextPage = () => {
   };
 
   return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <h2 className="card-title">Transfer Tokens</h2>
+
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Recipient Address</span>
+          </label>
+          <AddressInput value={recipientAddress} onChange={setRecipientAddress} placeholder="0x..." />
+        </div>
+
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">Amount to Transfer</span>
+          </label>
+          <div className="join">
+            <input
+              type="number"
+              placeholder="0.0"
+              className="input input-bordered w-full join-item"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+            />
+            <div className="join-item btn btn-disabled">{tokenSymbol}</div>
+          </div>
+        </div>
+
+        <div className="card-actions justify-end mt-4">
+          <button className="btn btn-primary" onClick={handleTransfer}>
+            Send Tokens
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RecentTransfersCard = () => {
+  const { data: transferEvents, isLoading: isLoadingEvents } = useScaffoldEventHistory({
+    contractName: "ExampleToken",
+    eventName: "Transfer",
+    fromBlock: 0n,
+    watch: true,
+  });
+
+  return (
+    <div className="card bg-base-100 shadow-xl">
+      <div className="card-body">
+        <h2 className="card-title mb-4">Recent Transfers</h2>
+        <div className="overflow-x-auto">
+          {isLoadingEvents ? (
+            <div className="text-center py-4">Loading events...</div>
+          ) : !transferEvents || transferEvents.length === 0 ? (
+            <div className="text-center py-4 opacity-50">No transfers yet</div>
+          ) : (
+            <table className="table table-zebra w-full text-sm">
+              <thead>
+                <tr>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...transferEvents]
+                  .reverse()
+                  .slice(0, 10)
+                  .map((event, index) => (
+                    <tr key={index}>
+                      <td>
+                        <Address address={event.args.from} size="xs" />
+                      </td>
+                      <td>
+                        <Address address={event.args.to} size="xs" />
+                      </td>
+                      <td>{event.args.value ? formatUnits(event.args.value, 18) : "0"}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TokenTransfer: NextPage = () => {
+  const { data: tokenName } = useScaffoldReadContract({
+    contractName: "ExampleToken",
+    functionName: "name",
+  });
+
+  const { data: tokenSymbol } = useScaffoldReadContract({
+    contractName: "ExampleToken",
+    functionName: "symbol",
+  });
+
+  return (
     <div className="flex items-center flex-col flex-grow pt-10">
       <div className="px-5 w-full max-w-4xl">
         <h1 className="text-center mb-8">
@@ -67,114 +188,14 @@ const TokenTransfer: NextPage = () => {
           </span>
         </h1>
 
-        <div className="flex flex-col gap-6">
-          {/* Token Info Card */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">Token Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm opacity-70">Total Supply</p>
-                  <p className="text-2xl font-bold">
-                    {totalSupply ? formatUnits(totalSupply, 18) : "0"} {tokenSymbol}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm opacity-70">Your Balance</p>
-                  <p className="text-2xl font-bold">
-                    {balance ? formatUnits(balance, 18) : "0"} {tokenSymbol}
-                  </p>
-                </div>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="flex flex-col gap-6">
+            <TokenInfoCard />
+            <TransferCard />
           </div>
 
-          {/* Transfer Card */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">Transfer Tokens</h2>
-
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text">From (Your Address)</span>
-                </label>
-                <Address address={connectedAddress} />
-              </div>
-
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text">To (Recipient Address)</span>
-                </label>
-                <AddressInput
-                  value={recipientAddress}
-                  onChange={setRecipientAddress}
-                  placeholder="Enter recipient address"
-                />
-              </div>
-
-              <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text">Amount ({tokenSymbol})</span>
-                </label>
-                <input
-                  type="number"
-                  placeholder="0.0"
-                  className="input input-bordered w-full"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  step="0.000000000000000001"
-                  min="0"
-                />
-                <label className="label">
-                  <span className="label-text-alt">
-                    Balance: {balance ? formatUnits(balance, 18) : "0"} {tokenSymbol}
-                  </span>
-                </label>
-              </div>
-
-              <div className="card-actions justify-end mt-4">
-                <button
-                  className="btn btn-primary"
-                  onClick={handleTransfer}
-                  disabled={!connectedAddress || !recipientAddress || !amount}
-                >
-                  Transfer
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Tutorial Card */}
-          <div className="card bg-base-200 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">How to Use</h2>
-              <ol className="list-decimal list-inside space-y-2">
-                <li>Connect your wallet using the button in the header</li>
-                <li>Check your token balance in the Token Information section</li>
-                <li>Enter the recipient&apos;s address</li>
-                <li>Enter the amount of tokens to transfer</li>
-                <li>Click &quot;Transfer&quot; and confirm the transaction in your wallet</li>
-              </ol>
-              <div className="alert alert-info mt-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="stroke-current shrink-0 w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  ></path>
-                </svg>
-                <span>
-                  This is a fixed-supply ERC-20 token. The entire supply was minted to the deployer on contract
-                  creation.
-                </span>
-              </div>
-            </div>
+          <div className="flex flex-col gap-6">
+            <RecentTransfersCard />
           </div>
         </div>
       </div>
