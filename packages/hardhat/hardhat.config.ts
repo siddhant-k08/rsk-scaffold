@@ -12,7 +12,7 @@ import "hardhat-deploy-ethers";
 
 // If not set, it uses the hardhat account 0 private key.
 const deployerPrivateKey =
-  process.env.DEPLOYER_PRIVATE_KEY;
+  process.env.DEPLOYER_PRIVATE_KEY || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
 // forking rpc url
 const forkingURL = process.env.FORKING_URL || "";
@@ -50,6 +50,7 @@ const config: HardhatUserConfig = {
         url: forkingURL,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
+      saveDeployments: true,
     },
     rootstockTestnet: {
       url: rootstockRpcUrl,
