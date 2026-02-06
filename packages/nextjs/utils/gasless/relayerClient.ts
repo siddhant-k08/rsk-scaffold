@@ -38,3 +38,20 @@ export async function getNonce(address: string): Promise<bigint> {
   const data = await response.json();
   return BigInt(data.nonce);
 }
+
+export async function relayBatchTransactions(requests: RelayRequest[]): Promise<RelayResponse> {
+  const response = await fetch(`${RELAYER_URL}/relay/batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ requests }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to relay batch transactions");
+  }
+
+  return response.json();
+}

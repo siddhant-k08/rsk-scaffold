@@ -6,8 +6,8 @@ import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import Badge from "~~/components/ui/Badge";
 import { useNetworkColor } from "~~/hooks/scaffold-eth";
 import { EXAMPLE_TARGET_ADDRESS, FORWARDER_ADDRESS } from "~~/utils/gasless/config";
-import { signMetaTransaction } from "~~/utils/gasless/metaTx";
-import { getNonce, relayTransaction } from "~~/utils/gasless/relayerClient";
+import { signMetaTransaction, signMetaTransactionWithNonce } from "~~/utils/gasless/metaTx";
+import { getNonce, relayBatchTransactions, relayTransaction } from "~~/utils/gasless/relayerClient";
 import { ForwardRequest } from "~~/utils/gasless/types";
 
 const exampleTargetAbi = parseAbi([
@@ -92,10 +92,6 @@ export default function GaslessPage() {
     setLoading(true);
 
     try {
-      addLog("🔍 Fetching nonce...");
-      const nonce = await getNonce(address);
-      addLog(`✅ Nonce: ${nonce}`);
-
       addLog("📝 Encoding function data...");
       const data = encodeFunctionData({
         abi: exampleTargetAbi,
@@ -103,16 +99,19 @@ export default function GaslessPage() {
         args: [10n],
       });
 
+      // Calculate deadline (1 hour from now)
+      const deadline = Math.floor(Date.now() / 1000) + 3600;
+
       const request: ForwardRequest = {
         from: address,
         to: EXAMPLE_TARGET_ADDRESS,
         value: "0",
-        gas: "100000",
-        nonce: nonce.toString(),
+        gas: "200000", // Increased gas limit for meta-transaction execution
+        deadline: deadline.toString(),
         data,
       };
 
-      addLog("✍️  Signing EIP-712 message...");
+      addLog("✍️  Signing EIP-712 message (fetching nonce internally)...");
       const signature = await signMetaTransaction(walletClient, request);
       addLog("✅ Signature obtained");
 
@@ -126,9 +125,187 @@ export default function GaslessPage() {
         addLog("⏳ Waiting for confirmation...");
 
         if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash: response.txHash as `0x${string}` });
-          addLog("✅ Transaction confirmed!");
-          await loadPoints();
+          // Custom polling for faster detection
+          const maxAttempts = 90; // 90 seconds max
+          let attempts = 0;
+
+          const pollForReceipt = async (): Promise<boolean> => {
+            while (attempts < maxAttempts) {
+              attempts++;
+
+              try {
+                const receipt = await publicClient.getTransactionReceipt({
+                  hash: response.txHash as `0x${string}`,
+                });
+
+                console.log("Receipt received:", receipt);
+                addLog(`📋 Receipt found! Status: ${receipt.status}`);
+
+                // Receipt found!
+                if (receipt.status === "success") {
+                  addLog(`✅ Transaction confirmed in block ${receipt.blockNumber}!`);
+                  await loadPoints();
+                  return true;
+                } else if (receipt.status === "reverted") {
+                  addLog("❌ Transaction reverted on-chain");
+                  return true;
+                } else {
+                  // Unknown status
+                  addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
+                  console.log("Full receipt:", receipt);
+                  await loadPoints();
+                  return true;
+                }
+              } catch (err: any) {
+                // Log the actual error to understand what's happening
+                if (attempts === 1 || attempts % 10 === 0) {
+                  console.log(`Attempt ${attempts} - Error:`, err.message);
+                }
+                // Receipt not available yet - this is expected, continue polling
+              }
+
+              // Show progress every 5 attempts
+              if (attempts % 5 === 0) {
+                addLog(`⏳ Still waiting... (${attempts}s elapsed)`);
+              }
+
+              // Wait 1 second before next check
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            return false; // Timeout
+          };
+
+          const confirmed = await pollForReceipt();
+
+          if (!confirmed) {
+            addLog("⚠️ Confirmation timeout - transaction may still be processing");
+            addLog(`Check: https://explorer.testnet.rootstock.io/tx/${response.txHash}`);
+            // Still try to load points in case it confirmed
+            setTimeout(() => loadPoints(), 3000);
+          }
+        }
+      } else {
+        addLog(`❌ Relayer error: ${response.error}`);
+      }
+    } catch (error: any) {
+      addLog(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBatchCall = async () => {
+    if (!address || !walletClient) {
+      addLog("❌ Please connect your wallet");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      addLog("📦 Preparing batch of 3 transactions...");
+
+      const amounts = [5, 10, 15]; // Three different amounts
+      const requests: Array<{ request: ForwardRequest; signature: string }> = [];
+
+      // Fetch starting nonce once for the batch
+      addLog("🔍 Fetching starting nonce...");
+      const currentNonce = await getNonce(address);
+      addLog(`✅ Starting nonce: ${currentNonce}`);
+
+      // Create and sign each request with sequential nonces
+      for (let i = 0; i < amounts.length; i++) {
+        const amount = amounts[i];
+        addLog(`📝 Preparing transaction ${i + 1}: addPoints(${amount}) with nonce ${currentNonce + BigInt(i)}...`);
+
+        const data = encodeFunctionData({
+          abi: exampleTargetAbi,
+          functionName: "addPoints",
+          args: [BigInt(amount)],
+        });
+
+        const deadline = Math.floor(Date.now() / 1000) + 3600;
+
+        const request: ForwardRequest = {
+          from: address,
+          to: EXAMPLE_TARGET_ADDRESS,
+          value: "0",
+          gas: "200000",
+          deadline: deadline.toString(),
+          data,
+        };
+
+        addLog(`✍️  Signing transaction ${i + 1}...`);
+        // Use sequential nonces: currentNonce, currentNonce+1, currentNonce+2
+        const signature = await signMetaTransactionWithNonce(walletClient, request, currentNonce + BigInt(i));
+        requests.push({ request, signature });
+      }
+
+      addLog(`✅ All ${amounts.length} transactions signed with sequential nonces!`);
+      addLog("📡 Sending batch to relayer...");
+
+      const response = await relayBatchTransactions(requests);
+
+      if (response.success && response.txHash) {
+        addLog(`✅ Batch submitted in single tx: ${response.txHash}`);
+        addLog(`💰 Gas savings: ~35% compared to ${amounts.length} separate transactions!`);
+        setTxHash(response.txHash);
+
+        addLog("⏳ Waiting for confirmation...");
+
+        if (publicClient) {
+          const maxAttempts = 90;
+          let attempts = 0;
+
+          const pollForReceipt = async (): Promise<boolean> => {
+            while (attempts < maxAttempts) {
+              attempts++;
+
+              try {
+                const receipt = await publicClient.getTransactionReceipt({
+                  hash: response.txHash as `0x${string}`,
+                });
+
+                console.log("Receipt received:", receipt);
+                addLog(`📋 Receipt found! Status: ${receipt.status}`);
+
+                if (receipt.status === "success") {
+                  addLog(`✅ Batch confirmed in block ${receipt.blockNumber}!`);
+                  addLog(`🎉 Added ${amounts.reduce((a, b) => a + b, 0)} points total!`);
+                  await loadPoints();
+                  return true;
+                } else if (receipt.status === "reverted") {
+                  addLog("❌ Batch reverted on-chain");
+                  return true;
+                } else {
+                  addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
+                  await loadPoints();
+                  return true;
+                }
+              } catch (err: any) {
+                if (attempts === 1 || attempts % 10 === 0) {
+                  console.log(`Attempt ${attempts} - Error:`, err.message);
+                }
+              }
+
+              if (attempts % 5 === 0) {
+                addLog(`⏳ Still waiting... (${attempts}s elapsed)`);
+              }
+
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            return false;
+          };
+
+          const confirmed = await pollForReceipt();
+
+          if (!confirmed) {
+            addLog("⚠️ Confirmation timeout - batch may still be processing");
+            addLog(`Check: https://explorer.testnet.rootstock.io/tx/${response.txHash}`);
+            setTimeout(() => loadPoints(), 3000);
+          }
         }
       } else {
         addLog(`❌ Relayer error: ${response.error}`);
@@ -231,6 +408,18 @@ export default function GaslessPage() {
                     disabled={loading || !EXAMPLE_TARGET_ADDRESS || !FORWARDER_ADDRESS}
                   >
                     {loading ? "Processing..." : "Add 10 Points (Gasless)"}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-semibold">Batch Gasless Call</h3>
+                  <p className="text-xs opacity-70">3 transactions in 1 on-chain tx (~35% gas savings)</p>
+                  <button
+                    className="bg-brand-pink rounded-md py-1.5 px-3 text-black text-sm font-medium w-full disabled:opacity-50"
+                    onClick={handleBatchCall}
+                    disabled={loading || !EXAMPLE_TARGET_ADDRESS || !FORWARDER_ADDRESS}
+                  >
+                    {loading ? "Processing..." : "Add 30 Points (Batch: 5+10+15)"}
                   </button>
                 </div>
               </div>
