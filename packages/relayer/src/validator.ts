@@ -16,7 +16,9 @@ export function validateRelayRequest(request: ForwardRequest, signature: string)
     return { valid: false, error: "Invalid 'to' address" };
   }
 
-  if (request.to.toLowerCase() !== config.exampleTargetAddress.toLowerCase()) {
+  // Check if target is in the allowlist
+  const targetLower = request.to.toLowerCase();
+  if (!config.allowedTargets.includes(targetLower)) {
     return { valid: false, error: "Target contract not allowed" };
   }
 
@@ -46,10 +48,19 @@ export function validateRelayRequest(request: ForwardRequest, signature: string)
     return { valid: false, error: "Invalid value field" };
   }
 
+  // Validate deadline (uint48 - timestamp in seconds)
   try {
-    BigInt(request.nonce);
+    const deadline = Number(request.deadline);
+    const now = Math.floor(Date.now() / 1000);
+    if (deadline < now) {
+      return { valid: false, error: "Request deadline has expired" };
+    }
+    // Check if deadline is reasonable (not more than 1 year in future)
+    if (deadline > now + 365 * 24 * 60 * 60) {
+      return { valid: false, error: "Deadline too far in future" };
+    }
   } catch {
-    return { valid: false, error: "Invalid nonce value" };
+    return { valid: false, error: "Invalid deadline value" };
   }
 
   return { valid: true };
