@@ -1,7 +1,8 @@
+// OpenZeppelin ERC2771Forwarder ABI
 export const forwarderAbi = [
   {
     type: "constructor",
-    inputs: [],
+    inputs: [{ name: "name", type: "string" }],
     stateMutability: "nonpayable",
   },
   {
@@ -9,29 +10,48 @@ export const forwarderAbi = [
     name: "execute",
     inputs: [
       {
-        name: "req",
+        name: "request",
         type: "tuple",
         components: [
           { name: "from", type: "address" },
           { name: "to", type: "address" },
           { name: "value", type: "uint256" },
           { name: "gas", type: "uint256" },
-          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint48" },
           { name: "data", type: "bytes" },
+          { name: "signature", type: "bytes" },
         ],
       },
-      { name: "signature", type: "bytes" },
     ],
-    outputs: [
-      { name: "", type: "bool" },
-      { name: "", type: "bytes" },
-    ],
+    outputs: [],
     stateMutability: "payable",
   },
   {
     type: "function",
-    name: "getNonce",
-    inputs: [{ name: "from", type: "address" }],
+    name: "executeBatch",
+    inputs: [
+      {
+        name: "requests",
+        type: "tuple[]",
+        components: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "gas", type: "uint256" },
+          { name: "deadline", type: "uint48" },
+          { name: "data", type: "bytes" },
+          { name: "signature", type: "bytes" },
+        ],
+      },
+      { name: "refundReceiver", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "nonces",
+    inputs: [{ name: "owner", type: "address" }],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
@@ -40,38 +60,44 @@ export const forwarderAbi = [
     name: "verify",
     inputs: [
       {
-        name: "req",
+        name: "request",
         type: "tuple",
         components: [
           { name: "from", type: "address" },
           { name: "to", type: "address" },
           { name: "value", type: "uint256" },
           { name: "gas", type: "uint256" },
-          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint48" },
           { name: "data", type: "bytes" },
+          { name: "signature", type: "bytes" },
         ],
       },
-      { name: "signature", type: "bytes" },
     ],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "getDomainSeparator",
+    name: "eip712Domain",
     inputs: [],
-    outputs: [{ name: "", type: "bytes32" }],
+    outputs: [
+      { name: "fields", type: "bytes1" },
+      { name: "name", type: "string" },
+      { name: "version", type: "string" },
+      { name: "chainId", type: "uint256" },
+      { name: "verifyingContract", type: "address" },
+      { name: "salt", type: "bytes32" },
+      { name: "extensions", type: "uint256[]" },
+    ],
     stateMutability: "view",
   },
   {
     type: "event",
-    name: "MetaTransactionExecuted",
+    name: "ExecutedForwardRequest",
     inputs: [
-      { name: "from", type: "address", indexed: true },
-      { name: "to", type: "address", indexed: true },
+      { name: "signer", type: "address", indexed: true },
       { name: "nonce", type: "uint256", indexed: false },
       { name: "success", type: "bool", indexed: false },
-      { name: "returnData", type: "bytes", indexed: false },
     ],
   },
 ] as const;
