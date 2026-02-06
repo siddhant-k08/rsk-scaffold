@@ -35,7 +35,7 @@ const config: HardhatUserConfig = {
       },
     ],
   },
-  defaultNetwork: "rootstockTestnet",
+  defaultNetwork: "hardhat", // Changed from "rootstockTestnet" for local development
   namedAccounts: {
     deployer: {
       // By default, it will take the first Hardhat account as the deployer
