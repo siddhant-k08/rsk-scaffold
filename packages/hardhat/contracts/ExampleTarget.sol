@@ -1,8 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./ERC2771Context.sol";
-import "hardhat/console.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 contract ExampleTarget is ERC2771Context {
     mapping(address => uint256) public points;
@@ -14,8 +13,6 @@ contract ExampleTarget is ERC2771Context {
     function addPoints(uint256 amount) public {
         address user = _msgSender();
         points[user] += amount;
-        
-        console.log("Adding %s points to %s", amount, user);
         
         emit PointsAdded(user, amount, points[user]);
     }
