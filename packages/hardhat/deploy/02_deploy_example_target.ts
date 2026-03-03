@@ -6,7 +6,7 @@ const deployExampleTarget: DeployFunction = async function (hre: HardhatRuntimeE
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  const forwarder = await hre.ethers.getContract<Contract>("Forwarder", deployer);
+  const forwarder = await hre.ethers.getContract<Contract>("OZForwarder", deployer);
   const forwarderAddress = await forwarder.getAddress();
 
   await deploy("ExampleTarget", {
@@ -18,10 +18,10 @@ const deployExampleTarget: DeployFunction = async function (hre: HardhatRuntimeE
 
   const exampleTarget = await hre.ethers.getContract<Contract>("ExampleTarget", deployer);
   console.log("✅ ExampleTarget deployed at:", await exampleTarget.getAddress());
-  console.log("   Trusted Forwarder:", forwarderAddress);
+  console.log("   Trusted Forwarder (OZForwarder):", forwarderAddress);
 };
 
 export default deployExampleTarget;
 
 deployExampleTarget.tags = ["ExampleTarget"];
-deployExampleTarget.dependencies = ["Forwarder"];
+deployExampleTarget.dependencies = ["OZForwarder"];
