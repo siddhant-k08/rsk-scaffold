@@ -10,6 +10,7 @@ import {
   getTransactionStatus,
   getNonce,
   getRelayerBalance,
+  publicClient,
 } from "./relayer";
 import {
   ipRateLimiter,
@@ -24,8 +25,14 @@ import { sanitizeError, sanitizeValidationError } from "./errorHandler";
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// Configure CORS based on allowed origins
+const corsOptions: cors.CorsOptions = {
+  origin: config.allowedOrigins.length > 0 ? config.allowedOrigins : true,
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10kb' }));
 
 // Apply global rate limiters
 app.use(concurrentRequestLimiter);
@@ -63,10 +70,16 @@ app.post("/relay", ipRateLimiter, ipHourlyRateLimiter, addressRateLimiter, async
       } as RelayResponse);
     }
 
-    // Note: OpenZeppelin's execute function validates the signature internally
-    // The verify function may not work as expected, so we skip it and let execute handle validation
-    // If the signature is invalid, execute will revert with a clear error
-    
+    // Verify signature and nonce before execution to prevent gas drain
+    const isValidSignature = await verifyRequest(request, signature);
+    if (!isValidSignature) {
+      console.log("❌ Signature verification failed");
+      return res.status(400).json({
+        success: false,
+        error: "Invalid signature or nonce",
+      } as RelayResponse);
+    }
+
     console.log("✅ Validation passed, executing meta-transaction...");
     console.log("Request details:", {
       from: request.from,
@@ -84,17 +97,20 @@ app.post("/relay", ipRateLimiter, ipHourlyRateLimiter, addressRateLimiter, async
     } catch (execError: any) {
       console.error("❌ Execution failed:", execError.message);
       console.error("Full error:", execError);
+      const sanitized = sanitizeError(execError, "relay");
       return res.status(400).json({
         success: false,
-        error: "Transaction execution failed: " + (execError.shortMessage || execError.message),
+        error: sanitized.message,
       } as RelayResponse);
     }
 
-    // Note: In production, you would track actual gas used from the transaction receipt
-    // For now, we estimate based on the request gas limit
-    // This should be updated to use actual gas consumption after transaction confirmation
-    const estimatedGasPrice = BigInt(60000000); // 60 Mwei (typical for RSK)
-    trackGasSpent(BigInt(request.gas), estimatedGasPrice);
+    // Wait for transaction receipt to get actual gas consumption
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: txHash as `0x${string}`,
+    });
+    
+    // Track actual gas spent using receipt data
+    trackGasSpent(receipt.gasUsed, receipt.effectiveGasPrice);
 
     res.json({
       success: true,
@@ -114,6 +130,7 @@ app.post(
   "/relay/batch",
   ipRateLimiter,
   ipHourlyRateLimiter,
+  addressRateLimiter,
   async (req: Request, res: Response) => {
     try {
       const batchRequest = req.body as BatchRelayRequest;
@@ -158,6 +175,23 @@ app.post(
         } as BatchRelayResponse);
       }
 
+      // Verify all signatures before execution to prevent gas drain
+      const signatureVerificationErrors: string[] = [];
+      for (let i = 0; i < batchRequest.requests.length; i++) {
+        const { request, signature } = batchRequest.requests[i];
+        const isValidSignature = await verifyRequest(request, signature);
+        if (!isValidSignature) {
+          signatureVerificationErrors.push(`Request ${i}: Invalid signature or nonce`);
+        }
+      }
+
+      if (signatureVerificationErrors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Signature verification failed: ${signatureVerificationErrors.join("; ")}`,
+        } as BatchRelayResponse);
+      }
+
       // Check daily budget
       if (!checkDailyBudget()) {
         return res.status(503).json({
@@ -179,10 +213,13 @@ app.post(
 
       console.log(`✅ Batch executed: ${txHash}`);
 
-      // Track gas spent (estimate for batch)
-      const estimatedGas = requests.reduce((sum, req) => sum + BigInt(req.gas), 0n);
-      const estimatedGasPrice = 60000000n; // 60 Mwei (same as single relay)
-      trackGasSpent(estimatedGas, estimatedGasPrice);
+      // Wait for transaction receipt to get actual gas consumption
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+      });
+      
+      // Track actual gas spent using receipt data
+      trackGasSpent(receipt.gasUsed, receipt.effectiveGasPrice);
 
       res.json({
         success: true,

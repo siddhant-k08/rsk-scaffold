@@ -1,13 +1,10 @@
-import { FORWARDER_ADDRESS } from "./config";
+import { CHAIN_ID, FORWARDER_ADDRESS } from "./config";
 import { getNonce } from "./relayerClient";
-import { EIP712_DOMAIN, EIP712_TYPES, ForwardRequest } from "./types";
+import { EIP712_TYPES, ForwardRequest, getEIP712Domain } from "./types";
 import { WalletClient } from "viem";
 
 export async function signMetaTransaction(walletClient: WalletClient, request: ForwardRequest): Promise<string> {
-  const domain = {
-    ...EIP712_DOMAIN,
-    verifyingContract: FORWARDER_ADDRESS,
-  };
+  const domain = getEIP712Domain(CHAIN_ID, FORWARDER_ADDRESS);
 
   const account = walletClient.account;
   if (!account) {
@@ -42,10 +39,7 @@ export async function signMetaTransactionWithNonce(
   request: ForwardRequest,
   nonce: bigint,
 ): Promise<string> {
-  const domain = {
-    ...EIP712_DOMAIN,
-    verifyingContract: FORWARDER_ADDRESS,
-  };
+  const domain = getEIP712Domain(CHAIN_ID, FORWARDER_ADDRESS);
 
   const account = walletClient.account;
   if (!account) {

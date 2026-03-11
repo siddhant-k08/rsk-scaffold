@@ -1,10 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { ExampleTarget } from "../typechain-types";
+import { ERC2771Forwarder } from "../typechain-types/@openzeppelin/contracts/metatx";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
-  let forwarder: any;
+  let forwarder: ERC2771Forwarder;
   let exampleTarget: ExampleTarget;
   let user: SignerWithAddress;
   let user2: SignerWithAddress;
