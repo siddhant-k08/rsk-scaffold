@@ -5,7 +5,7 @@ async function main() {
   console.log("================================\n");
 
   try {
-    const forwarder = await deployments.get("Forwarder");
+    const forwarder = await deployments.get("OZForwarder");
     console.log("Forwarder:", forwarder.address);
   } catch {
     console.log("Forwarder: Not deployed");

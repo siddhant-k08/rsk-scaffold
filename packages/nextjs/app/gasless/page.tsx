@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { encodeFunctionData, parseAbi } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import Badge from "~~/components/ui/Badge";
@@ -14,6 +14,63 @@ const exampleTargetAbi = parseAbi([
   "function addPoints(uint256 amount) public",
   "function getPoints(address user) public view returns (uint256)",
 ]);
+
+// Helper function to poll for transaction receipt
+async function pollForTransactionReceipt({
+  txHash,
+  publicClient,
+  addLog,
+  maxAttempts = 60,
+  onSuccess,
+  onReverted,
+  onUnknown,
+}: {
+  txHash: `0x${string}`;
+  publicClient: any;
+  addLog: (message: string) => void;
+  maxAttempts?: number;
+  onSuccess: (receipt: any) => Promise<void>;
+  onReverted: () => void;
+  onUnknown: (receipt: any) => Promise<void>;
+}): Promise<boolean> {
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+
+    try {
+      const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+
+      console.log("Receipt received:", receipt);
+      addLog(`📋 Receipt found! Status: ${receipt.status}`);
+
+      if (receipt.status === "success") {
+        await onSuccess(receipt);
+        return true;
+      } else if (receipt.status === "reverted") {
+        onReverted();
+        return true;
+      } else {
+        addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
+        console.log("Full receipt:", receipt);
+        await onUnknown(receipt);
+        return true;
+      }
+    } catch (err: any) {
+      if (attempts === 1 || attempts % 10 === 0) {
+        console.log(`Attempt ${attempts} - Error:`, err.message);
+      }
+    }
+
+    if (attempts % 5 === 0) {
+      addLog(`⏳ Still waiting... (${attempts}s elapsed)`);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  return false; // Timeout
+}
 
 export default function GaslessPage() {
   const { address, isConnected } = useAccount();
@@ -40,12 +97,23 @@ export default function GaslessPage() {
         functionName: "getPoints",
         args: [address],
       });
-
-      setPoints(result);
-    } catch (error: any) {
-      console.error("Error loading points:", error);
+      setPoints(result as bigint);
+    } catch (error) {
+      console.error("Failed to load points:", error);
+      addLog("❌ Failed to load points");
     }
   };
+
+  // Auto-load points when account changes
+  useEffect(() => {
+    if (isConnected && address) {
+      loadPoints();
+    } else if (!isConnected) {
+      setPoints(0n);
+      setLogs([]);
+      setTxHash("");
+    }
+  }, [address, isConnected, loadPoints]);
 
   const handleDirectCall = async () => {
     if (!address || !walletClient) {
@@ -125,58 +193,22 @@ export default function GaslessPage() {
         addLog("⏳ Waiting for confirmation...");
 
         if (publicClient) {
-          // Custom polling for faster detection
-          const maxAttempts = 90; // 90 seconds max
-          let attempts = 0;
-
-          const pollForReceipt = async (): Promise<boolean> => {
-            while (attempts < maxAttempts) {
-              attempts++;
-
-              try {
-                const receipt = await publicClient.getTransactionReceipt({
-                  hash: response.txHash as `0x${string}`,
-                });
-
-                console.log("Receipt received:", receipt);
-                addLog(`📋 Receipt found! Status: ${receipt.status}`);
-
-                // Receipt found!
-                if (receipt.status === "success") {
-                  addLog(`✅ Transaction confirmed in block ${receipt.blockNumber}!`);
-                  await loadPoints();
-                  return true;
-                } else if (receipt.status === "reverted") {
-                  addLog("❌ Transaction reverted on-chain");
-                  return true;
-                } else {
-                  // Unknown status
-                  addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
-                  console.log("Full receipt:", receipt);
-                  await loadPoints();
-                  return true;
-                }
-              } catch (err: any) {
-                // Log the actual error to understand what's happening
-                if (attempts === 1 || attempts % 10 === 0) {
-                  console.log(`Attempt ${attempts} - Error:`, err.message);
-                }
-                // Receipt not available yet - this is expected, continue polling
-              }
-
-              // Show progress every 5 attempts
-              if (attempts % 5 === 0) {
-                addLog(`⏳ Still waiting... (${attempts}s elapsed)`);
-              }
-
-              // Wait 1 second before next check
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-
-            return false; // Timeout
-          };
-
-          const confirmed = await pollForReceipt();
+          const confirmed = await pollForTransactionReceipt({
+            txHash: response.txHash as `0x${string}`,
+            publicClient,
+            addLog,
+            onSuccess: async (receipt) => {
+              addLog(`✅ Transaction confirmed in block ${receipt.blockNumber}!`);
+              await loadPoints();
+            },
+            onReverted: () => {
+              addLog("❌ Transaction reverted on-chain");
+            },
+            onUnknown: async (receipt) => {
+              addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
+              await loadPoints();
+            },
+          });
 
           if (!confirmed) {
             addLog("⚠️ Confirmation timeout - transaction may still be processing");
@@ -255,51 +287,23 @@ export default function GaslessPage() {
         addLog("⏳ Waiting for confirmation...");
 
         if (publicClient) {
-          const maxAttempts = 90;
-          let attempts = 0;
-
-          const pollForReceipt = async (): Promise<boolean> => {
-            while (attempts < maxAttempts) {
-              attempts++;
-
-              try {
-                const receipt = await publicClient.getTransactionReceipt({
-                  hash: response.txHash as `0x${string}`,
-                });
-
-                console.log("Receipt received:", receipt);
-                addLog(`📋 Receipt found! Status: ${receipt.status}`);
-
-                if (receipt.status === "success") {
-                  addLog(`✅ Batch confirmed in block ${receipt.blockNumber}!`);
-                  addLog(`🎉 Added ${amounts.reduce((a, b) => a + b, 0)} points total!`);
-                  await loadPoints();
-                  return true;
-                } else if (receipt.status === "reverted") {
-                  addLog("❌ Batch reverted on-chain");
-                  return true;
-                } else {
-                  addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
-                  await loadPoints();
-                  return true;
-                }
-              } catch (err: any) {
-                if (attempts === 1 || attempts % 10 === 0) {
-                  console.log(`Attempt ${attempts} - Error:`, err.message);
-                }
-              }
-
-              if (attempts % 5 === 0) {
-                addLog(`⏳ Still waiting... (${attempts}s elapsed)`);
-              }
-
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-
-            return false;
-          };
-
-          const confirmed = await pollForReceipt();
+          const confirmed = await pollForTransactionReceipt({
+            txHash: response.txHash as `0x${string}`,
+            publicClient,
+            addLog,
+            onSuccess: async (receipt) => {
+              addLog(`✅ Batch confirmed in block ${receipt.blockNumber}!`);
+              addLog(`🎉 Added ${amounts.reduce((a, b) => a + b, 0)} points total!`);
+              await loadPoints();
+            },
+            onReverted: () => {
+              addLog("❌ Batch reverted on-chain");
+            },
+            onUnknown: async (receipt) => {
+              addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
+              await loadPoints();
+            },
+          });
 
           if (!confirmed) {
             addLog("⚠️ Confirmation timeout - batch may still be processing");

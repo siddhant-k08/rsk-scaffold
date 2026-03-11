@@ -17,6 +17,17 @@ function parseAllowedTargets(): string[] {
   return [];
 }
 
+// Parse allowed origins from comma-separated list
+function parseAllowedOrigins(): string[] {
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(origin => origin.length > 0);
+  }
+  return [];
+}
+
 export const config = {
   port: process.env.PORT || 3001,
   relayerPrivateKey: process.env.RELAYER_PRIVATE_KEY || "",
@@ -27,6 +38,7 @@ export const config = {
   exampleTargetAddress: (process.env.EXAMPLE_TARGET_ADDRESS || "") as `0x${string}`,
   
   allowedTargets: parseAllowedTargets(),
+  allowedOrigins: parseAllowedOrigins(),
   chainId: parseInt(process.env.CHAIN_ID || "31"),
 };
 
@@ -49,4 +61,13 @@ if (config.allowedTargets.length > 0) {
   });
 } else {
   console.warn("⚠️  No target contracts configured in allowlist");
+}
+
+if (config.allowedOrigins.length > 0) {
+  console.log(`✅ Allowed CORS origins: ${config.allowedOrigins.length}`);
+  config.allowedOrigins.forEach((origin, idx) => {
+    console.log(`   ${idx + 1}. ${origin}`);
+  });
+} else {
+  console.warn("⚠️  No CORS origins configured - allowing all origins (development mode)");
 }

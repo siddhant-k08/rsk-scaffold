@@ -93,14 +93,19 @@ export async function getTransactionStatus(txHash: string) {
       blockNumber: receipt.blockNumber.toString(),
     };
   } catch (error) {
-    const tx = await publicClient.getTransaction({
-      hash: txHash as `0x${string}`,
-    });
+    try {
+      const tx = await publicClient.getTransaction({
+        hash: txHash as `0x${string}`,
+      });
 
-    if (tx) {
-      return {
-        status: "pending",
-      };
+      if (tx) {
+        return {
+          status: "pending",
+        };
+      }
+    } catch (fallbackError) {
+      // Both getTransactionReceipt and getTransaction failed
+      // Transaction likely doesn't exist or there's a network issue
     }
 
     return {
@@ -138,6 +143,14 @@ export async function executeBatchMetaTransactions(
     throw new Error("Requests and signatures length mismatch");
   }
 
+  // Validate refundReceiver if provided
+  if (refundReceiver) {
+    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressRegex.test(refundReceiver)) {
+      throw new Error("Invalid refundReceiver address format");
+    }
+  }
+
   // Build ForwardRequestData array with signatures included
   const requestsData = requests.map((request, index) => ({
     from: request.from as `0x${string}`,
@@ -166,3 +179,5 @@ export async function executeBatchMetaTransactions(
 
   return hash;
 }
+
+export { publicClient };
