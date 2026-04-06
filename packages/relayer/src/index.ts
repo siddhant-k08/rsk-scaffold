@@ -50,11 +50,11 @@ app.post("/relay", ipRateLimiter, ipHourlyRateLimiter, addressRateLimiter, async
   try {
     const { request, signature } = req.body as RelayRequest;
 
-    console.log("📥 Relay request received from:", request.from);
+    // Relay request received
 
     // Check daily budget
     if (!checkDailyBudget()) {
-      console.log("❌ Daily budget exceeded");
+      // Daily budget check failed - returning 503
       return res.status(503).json({
         success: false,
         error: "Service temporarily unavailable: Daily gas budget exceeded",
@@ -63,7 +63,7 @@ app.post("/relay", ipRateLimiter, ipHourlyRateLimiter, addressRateLimiter, async
 
     const validation = validateRelayRequest(request, signature);
     if (!validation.valid) {
-      console.log("❌ Validation failed:", validation.error);
+      // Request validation failed
       return res.status(400).json({
         success: false,
         error: sanitizeValidationError(validation.error || "Invalid request"),
@@ -73,27 +73,19 @@ app.post("/relay", ipRateLimiter, ipHourlyRateLimiter, addressRateLimiter, async
     // Verify signature and nonce before execution to prevent gas drain
     const isValidSignature = await verifyRequest(request, signature);
     if (!isValidSignature) {
-      console.log("❌ Signature verification failed");
+      // Signature verification failed
       return res.status(400).json({
         success: false,
         error: "Invalid signature or nonce",
       } as RelayResponse);
     }
 
-    console.log("✅ Validation passed, executing meta-transaction...");
-    console.log("Request details:", {
-      from: request.from,
-      to: request.to,
-      value: request.value,
-      gas: request.gas,
-      deadline: request.deadline,
-      data: request.data.substring(0, 20) + "...",
-    });
+    // Validation passed, executing meta-transaction
 
     let txHash: string;
     try {
       txHash = await executeMetaTransaction(request, signature);
-      console.log("✅ Meta-transaction submitted:", txHash);
+      // Meta-transaction submitted successfully
     } catch (execError: any) {
       console.error("❌ Execution failed:", execError.message);
       console.error("Full error:", execError);
@@ -156,7 +148,7 @@ app.post(
         } as BatchRelayResponse);
       }
 
-      console.log(`📦 Batch relay request with ${batchRequest.requests.length} transactions`);
+      // Batch relay request received
 
       // Validate all requests
       const validationErrors: string[] = [];
@@ -172,6 +164,14 @@ app.post(
         return res.status(400).json({
           success: false,
           error: `Validation failed: ${validationErrors.join("; ")}`,
+        } as BatchRelayResponse);
+      }
+
+      // Check daily budget before expensive signature verification RPC calls
+      if (!checkDailyBudget()) {
+        return res.status(503).json({
+          success: false,
+          error: "Service temporarily unavailable: Daily gas budget exceeded",
         } as BatchRelayResponse);
       }
 
@@ -192,14 +192,6 @@ app.post(
         } as BatchRelayResponse);
       }
 
-      // Check daily budget
-      if (!checkDailyBudget()) {
-        return res.status(503).json({
-          success: false,
-          error: "Service temporarily unavailable: Daily gas budget exceeded",
-        } as BatchRelayResponse);
-      }
-
       // Extract requests and signatures
       const requests = batchRequest.requests.map(r => r.request);
       const signatures = batchRequest.requests.map(r => r.signature);
@@ -211,7 +203,7 @@ app.post(
         batchRequest.refundReceiver,
       );
 
-      console.log(`✅ Batch executed: ${txHash}`);
+      // Batch executed successfully
 
       // Wait for transaction receipt to get actual gas consumption
       const receipt = await publicClient.waitForTransactionReceipt({
@@ -252,7 +244,7 @@ app.get("/status/:txHash", async (req: Request, res: Response) => {
       } as StatusResponse);
     }
 
-    console.log("📊 Status check for:", txHash);
+    // Status check requested
 
     const status = await getTransactionStatus(txHash);
 
@@ -314,15 +306,5 @@ app.get("/health", async (req: Request, res: Response) => {
 const PORT = config.port;
 
 app.listen(PORT, () => {
-  console.log("🚀 RSK Meta-Transaction Relayer");
-  console.log(`📡 Listening on port ${PORT}`);
-  console.log(`⛓️  Chain ID: ${config.chainId}`);
-  console.log(`📝 Forwarder: ${config.forwarderAddress}`);
-  console.log(`🎯 Allowed Targets: ${config.allowedTargets.length} contract(s)`);
-  if (config.allowedTargets.length > 0 && config.allowedTargets.length <= 3) {
-    config.allowedTargets.forEach(addr => console.log(`   - ${addr}`));
-  } else if (config.allowedTargets.length > 3) {
-    console.log(`   (see startup logs above for full list)`);
-  }
-  console.log("");
+  // Relayer started successfully
 });

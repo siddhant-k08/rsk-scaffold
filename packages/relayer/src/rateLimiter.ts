@@ -38,7 +38,7 @@ function cleanupOldEntries(): void {
   keysToDelete.forEach(key => addressLimits.delete(key));
   
   if (keysToDelete.length > 0) {
-    console.log(`🧹 Cleaned up ${keysToDelete.length} old address rate limit entries`);
+    // Cleaned up old address rate limit entries
   }
 }
 
@@ -80,18 +80,35 @@ export const ipHourlyRateLimiter = rateLimit({
 
 // Per-address rate limiter middleware
 export function addressRateLimiter(req: Request, res: Response, next: Function) {
-  const { request } = req.body;
-
-  if (!request || !request.from) {
-    return next();
-  }
-
-  const address = request.from.toLowerCase();
+  const { request, requests } = req.body;
   const now = Date.now();
   const oneMinute = 60 * 1000;
   const oneHour = 60 * 60 * 1000;
   const cooldown = 1000; // 1 second
 
+  // Handle single request (req.body.request)
+  if (request && request.from) {
+    if (!checkAndUpdateAddressLimit(request.from.toLowerCase(), now, cooldown, res)) {
+      return;
+    }
+  }
+
+  // Handle batch requests (req.body.requests array)
+  if (requests && Array.isArray(requests)) {
+    for (const reqItem of requests) {
+      if (reqItem && reqItem.from) {
+        if (!checkAndUpdateAddressLimit(reqItem.from.toLowerCase(), now, cooldown, res)) {
+          return;
+        }
+      }
+    }
+  }
+
+  next();
+}
+
+// Helper function to check and update address limits
+function checkAndUpdateAddressLimit(address: string, now: number, cooldown: number, res: Response): boolean {
   let data = addressLimits.get(address);
 
   if (!data) {
@@ -99,8 +116,8 @@ export function addressRateLimiter(req: Request, res: Response, next: Function) 
       count: 0,
       hourlyCount: 0,
       lastRequest: 0,
-      minuteResetTime: now + oneMinute,
-      hourlyResetTime: now + oneHour,
+      minuteResetTime: now + 60 * 1000,
+      hourlyResetTime: now + 60 * 60 * 1000,
     };
     addressLimits.set(address, data);
   }
@@ -108,37 +125,40 @@ export function addressRateLimiter(req: Request, res: Response, next: Function) 
   // Reset hourly counter if needed
   if (now >= data.hourlyResetTime) {
     data.hourlyCount = 0;
-    data.hourlyResetTime = now + oneHour;
+    data.hourlyResetTime = now + 60 * 60 * 1000;
   }
 
   // Reset minute counter if needed
   if (now >= data.minuteResetTime) {
     data.count = 0;
-    data.minuteResetTime = now + oneMinute;
+    data.minuteResetTime = now + 60 * 1000;
   }
 
   // Check cooldown (1 second between requests)
   if (now - data.lastRequest < cooldown) {
-    return res.status(429).json({
+    res.status(429).json({
       success: false,
       error: "Rate limit exceeded: Please wait 1 second between requests",
     });
+    return false;
   }
 
   // Check per-minute limit (configurable)
   if (data.count >= RATE_LIMIT_PER_ADDRESS_PER_MIN) {
-    return res.status(429).json({
+    res.status(429).json({
       success: false,
       error: `Rate limit exceeded: Maximum ${RATE_LIMIT_PER_ADDRESS_PER_MIN} requests per minute per address`,
     });
+    return false;
   }
 
   // Check hourly limit (configurable)
   if (data.hourlyCount >= RATE_LIMIT_PER_ADDRESS_PER_HOUR) {
-    return res.status(429).json({
+    res.status(429).json({
       success: false,
       error: `Rate limit exceeded: Maximum ${RATE_LIMIT_PER_ADDRESS_PER_HOUR} requests per hour per address`,
     });
+    return false;
   }
 
   // Update counters
@@ -146,7 +166,7 @@ export function addressRateLimiter(req: Request, res: Response, next: Function) 
   data.hourlyCount++;
   data.lastRequest = now;
 
-  next();
+  return true;
 }
 
 // Global concurrent request limiter

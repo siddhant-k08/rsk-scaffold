@@ -55,18 +55,18 @@ if (!config.exampleTargetAddress && config.allowedTargets.length === 0) {
 }
 
 if (config.allowedTargets.length > 0) {
-  console.log(`✅ Allowed target contracts: ${config.allowedTargets.length}`);
+  // Allowed target contracts configured
   config.allowedTargets.forEach((addr, idx) => {
-    console.log(`   ${idx + 1}. ${addr}`);
+    // Target contract listed
   });
 } else {
   console.warn("⚠️  No target contracts configured in allowlist");
 }
 
 if (config.allowedOrigins.length > 0) {
-  console.log(`✅ Allowed CORS origins: ${config.allowedOrigins.length}`);
+  // Allowed CORS origins configured
   config.allowedOrigins.forEach((origin, idx) => {
-    console.log(`   ${idx + 1}. ${origin}`);
+    // CORS origin listed
   });
 } else {
   console.warn("⚠️  No CORS origins configured - allowing all origins (development mode)");

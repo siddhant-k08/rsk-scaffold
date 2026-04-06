@@ -10,9 +10,17 @@ import "@nomicfoundation/hardhat-verify";
 import "hardhat-deploy";
 import "hardhat-deploy-ethers";
 
-// If not set, it uses the hardhat account 0 private key.
-const deployerPrivateKey =
-  process.env.DEPLOYER_PRIVATE_KEY || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+// Get deployer private key from environment variable
+const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
+
+// For non-hardhat networks, DEPLOYER_PRIVATE_KEY is required to prevent accidental deployments with default keys
+if (!deployerPrivateKey && process.env.HARDHAT_NETWORK !== "hardhat" && process.env.HARDHAT_NETWORK) {
+  throw new Error("DEPLOYER_PRIVATE_KEY env var is required for non-hardhat networks");
+}
+
+// Use Hardhat default key only for local hardhat network
+const finalDeployerPrivateKey =
+  deployerPrivateKey || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
 // forking rpc url
 const forkingURL = process.env.FORKING_URL || "";
@@ -54,7 +62,7 @@ const config: HardhatUserConfig = {
     },
     rootstockTestnet: {
       url: rootstockRpcUrl,
-      accounts: [deployerPrivateKey],
+      accounts: [finalDeployerPrivateKey],
       chainId: 31,
     },
   },

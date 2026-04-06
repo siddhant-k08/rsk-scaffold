@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { encodeFunctionData, parseAbi } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import Badge from "~~/components/ui/Badge";
@@ -41,7 +41,7 @@ async function pollForTransactionReceipt({
     try {
       const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
 
-      console.log("Receipt received:", receipt);
+      // Receipt received
       addLog(`📋 Receipt found! Status: ${receipt.status}`);
 
       if (receipt.status === "success") {
@@ -52,13 +52,13 @@ async function pollForTransactionReceipt({
         return true;
       } else {
         addLog(`⚠️ Unknown receipt status: ${receipt.status}`);
-        console.log("Full receipt:", receipt);
+        // Unknown receipt status - logging to user
         await onUnknown(receipt);
         return true;
       }
-    } catch (err: any) {
+    } catch {
       if (attempts === 1 || attempts % 10 === 0) {
-        console.log(`Attempt ${attempts} - Error:`, err.message);
+        // Error occurred during polling
       }
     }
 
@@ -79,17 +79,26 @@ export default function GaslessPage() {
   const networkColor = useNetworkColor();
 
   const [points, setPoints] = useState<bigint>(0n);
-  const [loading, setLoading] = useState(false);
+  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [loadingTransaction, setLoadingTransaction] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [txHash, setTxHash] = useState<string>("");
+  const activeTimers = useRef<NodeJS.Timeout[]>([]);
 
-  const addLog = (message: string) => {
+  const addLog = useCallback((message: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
-  };
+  }, []);
 
-  const loadPoints = async () => {
+  const addTimer = useCallback((callback: () => void, delay: number) => {
+    const timer = setTimeout(callback, delay);
+    activeTimers.current.push(timer);
+    return timer;
+  }, []);
+
+  const loadPoints = useCallback(async () => {
     if (!address || !publicClient) return;
 
+    setLoadingPoints(true);
     try {
       const result = await publicClient.readContract({
         address: EXAMPLE_TARGET_ADDRESS,
@@ -101,8 +110,10 @@ export default function GaslessPage() {
     } catch (error) {
       console.error("Failed to load points:", error);
       addLog("❌ Failed to load points");
+    } finally {
+      setLoadingPoints(false);
     }
-  };
+  }, [address, publicClient, addLog]);
 
   // Auto-load points when account changes
   useEffect(() => {
@@ -115,13 +126,21 @@ export default function GaslessPage() {
     }
   }, [address, isConnected, loadPoints]);
 
+  // Cleanup active timers on component unmount
+  useEffect(() => {
+    return () => {
+      activeTimers.current.forEach(timer => clearTimeout(timer));
+      activeTimers.current = [];
+    };
+  }, []);
+
   const handleDirectCall = async () => {
     if (!address || !walletClient) {
       addLog("❌ Please connect your wallet");
       return;
     }
 
-    setLoading(true);
+    setLoadingTransaction(true);
 
     try {
       addLog("📝 Preparing direct transaction...");
@@ -147,7 +166,7 @@ export default function GaslessPage() {
     } catch (error: any) {
       addLog(`❌ Error: ${error.message}`);
     } finally {
-      setLoading(false);
+      setLoadingTransaction(false);
     }
   };
 
@@ -157,7 +176,7 @@ export default function GaslessPage() {
       return;
     }
 
-    setLoading(true);
+    setLoadingTransaction(true);
 
     try {
       addLog("📝 Encoding function data...");
@@ -214,7 +233,7 @@ export default function GaslessPage() {
             addLog("⚠️ Confirmation timeout - transaction may still be processing");
             addLog(`Check: https://explorer.testnet.rootstock.io/tx/${response.txHash}`);
             // Still try to load points in case it confirmed
-            setTimeout(() => loadPoints(), 3000);
+            addTimer(() => loadPoints(), 3000);
           }
         }
       } else {
@@ -223,7 +242,7 @@ export default function GaslessPage() {
     } catch (error: any) {
       addLog(`❌ Error: ${error.message}`);
     } finally {
-      setLoading(false);
+      setLoadingTransaction(false);
     }
   };
 
@@ -233,7 +252,7 @@ export default function GaslessPage() {
       return;
     }
 
-    setLoading(true);
+    setLoadingTransaction(true);
 
     try {
       addLog("📦 Preparing batch of 3 transactions...");
@@ -308,7 +327,7 @@ export default function GaslessPage() {
           if (!confirmed) {
             addLog("⚠️ Confirmation timeout - batch may still be processing");
             addLog(`Check: https://explorer.testnet.rootstock.io/tx/${response.txHash}`);
-            setTimeout(() => loadPoints(), 3000);
+            addTimer(() => loadPoints(), 3000);
           }
         }
       } else {
@@ -317,7 +336,7 @@ export default function GaslessPage() {
     } catch (error: any) {
       addLog(`❌ Error: ${error.message}`);
     } finally {
-      setLoading(false);
+      setLoadingTransaction(false);
     }
   };
 
@@ -360,7 +379,7 @@ export default function GaslessPage() {
               <button
                 className="bg-brand-pink rounded-md py-1.5 px-3 text-black text-sm font-medium w-full disabled:opacity-50 mt-2"
                 onClick={loadPoints}
-                disabled={loading}
+                disabled={loadingPoints}
               >
                 Refresh
               </button>
@@ -397,9 +416,9 @@ export default function GaslessPage() {
                   <button
                     className="bg-brand-pink rounded-md py-1.5 px-3 text-black text-sm font-medium w-full disabled:opacity-50"
                     onClick={handleDirectCall}
-                    disabled={loading || !EXAMPLE_TARGET_ADDRESS}
+                    disabled={loadingTransaction || !EXAMPLE_TARGET_ADDRESS}
                   >
-                    {loading ? "Processing..." : "Add 10 Points (Pay Gas)"}
+                    {loadingTransaction ? "Processing..." : "Add 10 Points (Pay Gas)"}
                   </button>
                 </div>
 
@@ -409,9 +428,9 @@ export default function GaslessPage() {
                   <button
                     className="bg-brand-pink rounded-md py-1.5 px-3 text-black text-sm font-medium w-full disabled:opacity-50"
                     onClick={handleGaslessCall}
-                    disabled={loading || !EXAMPLE_TARGET_ADDRESS || !FORWARDER_ADDRESS}
+                    disabled={loadingTransaction || !EXAMPLE_TARGET_ADDRESS || !FORWARDER_ADDRESS}
                   >
-                    {loading ? "Processing..." : "Add 10 Points (Gasless)"}
+                    {loadingTransaction ? "Processing..." : "Add 10 Points (Gasless)"}
                   </button>
                 </div>
 
@@ -421,9 +440,9 @@ export default function GaslessPage() {
                   <button
                     className="bg-brand-pink rounded-md py-1.5 px-3 text-black text-sm font-medium w-full disabled:opacity-50"
                     onClick={handleBatchCall}
-                    disabled={loading || !EXAMPLE_TARGET_ADDRESS || !FORWARDER_ADDRESS}
+                    disabled={loadingTransaction || !EXAMPLE_TARGET_ADDRESS || !FORWARDER_ADDRESS}
                   >
-                    {loading ? "Processing..." : "Add 30 Points (Batch: 5+10+15)"}
+                    {loadingTransaction ? "Processing..." : "Add 30 Points (Batch: 5+10+15)"}
                   </button>
                 </div>
               </div>

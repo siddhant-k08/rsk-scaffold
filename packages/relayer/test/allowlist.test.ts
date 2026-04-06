@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { config } from "../src/config";
 import { validateRelayRequest } from "../src/validator";
 import { ForwardRequest } from "../src/types";
 
@@ -12,79 +11,85 @@ describe("Target Allowlist Configuration", function () {
     process.env = { ...originalEnv };
     delete process.env.EXAMPLE_TARGET_ADDRESS;
     delete process.env.ALLOWED_TARGETS;
+    
+    // Clear module cache to ensure config is re-read with new environment
+    delete require.cache[require.resolve("../src/config")];
   });
 
   afterEach(function () {
     // Restore original environment
     process.env = originalEnv;
+    
+    // Clear module cache after test
+    delete require.cache[require.resolve("../src/config")];
   });
 
   it("should parse single target from EXAMPLE_TARGET_ADDRESS", function () {
     process.env.EXAMPLE_TARGET_ADDRESS = "0x1234567890123456789012345678901234567890";
     
-    // Test the parsing function directly
-    const allowedTargets = config.allowedTargets;
+    // Import config dynamically to get fresh environment values
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(1);
-    expect(allowedTargets[0]).to.equal("0x1234567890123456789012345678901234567890");
+    expect(config.allowedTargets).to.have.length(1);
+    expect(config.allowedTargets[0]).to.equal("0x1234567890123456789012345678901234567890");
   });
 
   it("should parse multiple targets from ALLOWED_TARGETS", function () {
     process.env.ALLOWED_TARGETS = "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222,0x3333333333333333333333333333333333333333";
     
-    const allowedTargets = config.allowedTargets;
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(3);
-    expect(allowedTargets).to.include("0x1111111111111111111111111111111111111111");
-    expect(allowedTargets).to.include("0x2222222222222222222222222222222222222222");
-    expect(allowedTargets).to.include("0x3333333333333333333333333333333333333333");
+    expect(config.allowedTargets).to.have.length(3);
+    expect(config.allowedTargets).to.include("0x1111111111111111111111111111111111111111");
+    expect(config.allowedTargets).to.include("0x2222222222222222222222222222222222222222");
+    expect(config.allowedTargets).to.include("0x3333333333333333333333333333333333333333");
   });
 
   it("should prioritize ALLOWED_TARGETS over EXAMPLE_TARGET_ADDRESS", function () {
     process.env.EXAMPLE_TARGET_ADDRESS = "0x9999999999999999999999999999999999999999";
     process.env.ALLOWED_TARGETS = "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
     
-    const allowedTargets = config.allowedTargets;
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(2);
-    expect(allowedTargets).to.not.include("0x9999999999999999999999999999999999999999");
-    expect(allowedTargets).to.include("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    expect(allowedTargets).to.include("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    expect(config.allowedTargets).to.have.length(2);
+    expect(config.allowedTargets).to.not.include("0x9999999999999999999999999999999999999999");
+    expect(config.allowedTargets).to.include("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(config.allowedTargets).to.include("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
   });
 
   it("should handle whitespace correctly", function () {
     process.env.ALLOWED_TARGETS = " 0x1111111111111111111111111111111111111111 , 0x2222222222222222222222222222222222222222 ";
     
-    const allowedTargets = config.allowedTargets;
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(2);
-    expect(allowedTargets[0]).to.equal("0x1111111111111111111111111111111111111111");
-    expect(allowedTargets[1]).to.equal("0x2222222222222222222222222222222222222222");
+    expect(config.allowedTargets).to.have.length(2);
+    expect(config.allowedTargets[0]).to.equal("0x1111111111111111111111111111111111111111");
+    expect(config.allowedTargets[1]).to.equal("0x2222222222222222222222222222222222222222");
   });
 
   it("should convert addresses to lowercase", function () {
     process.env.ALLOWED_TARGETS = "0xABCDEF1234567890ABCDEF1234567890ABCDEF12";
     
-    const allowedTargets = config.allowedTargets;
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(1);
-    expect(allowedTargets[0]).to.equal("0xabcdef1234567890abcdef1234567890abcdef12");
+    expect(config.allowedTargets).to.have.length(1);
+    expect(config.allowedTargets[0]).to.equal("0xabcdef1234567890abcdef1234567890abcdef12");
   });
 
   it("should filter empty entries", function () {
     process.env.ALLOWED_TARGETS = "0x1111111111111111111111111111111111111111,,0x2222222222222222222222222222222222222222,  ,";
     
-    const allowedTargets = config.allowedTargets;
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(2);
-    expect(allowedTargets).to.include("0x1111111111111111111111111111111111111111");
-    expect(allowedTargets).to.include("0x2222222222222222222222222222222222222222");
+    expect(config.allowedTargets).to.have.length(2);
+    expect(config.allowedTargets).to.include("0x1111111111111111111111111111111111111111");
+    expect(config.allowedTargets).to.include("0x2222222222222222222222222222222222222222");
   });
 
   it("should return empty array when no targets configured", function () {
-    const allowedTargets = config.allowedTargets;
+    const { config } = require("../src/config");
     
-    expect(allowedTargets).to.have.length(0);
+    expect(config.allowedTargets).to.have.length(0);
   });
 });
 
@@ -94,11 +99,17 @@ describe("Target Allowlist Validation", function () {
     process.env = { ...originalEnv };
     delete process.env.EXAMPLE_TARGET_ADDRESS;
     delete process.env.ALLOWED_TARGETS;
+    
+    // Clear module cache to ensure config is re-read with new environment
+    delete require.cache[require.resolve("../src/config")];
   });
 
   afterEach(function () {
     // Restore original environment
     process.env = originalEnv;
+    
+    // Clear module cache after test
+    delete require.cache[require.resolve("../src/config")];
   });
 
   const createTestRequest = (to: string): ForwardRequest => ({
@@ -115,6 +126,8 @@ describe("Target Allowlist Validation", function () {
   it("should accept requests to allowed targets", function () {
     process.env.ALLOWED_TARGETS = "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
     
+    // Import config dynamically to get fresh environment values
+    const { config } = require("../src/config");
     const request = createTestRequest("0x1111111111111111111111111111111111111111");
     const result = validateRelayRequest(request, testSignature);
     
@@ -124,6 +137,8 @@ describe("Target Allowlist Validation", function () {
   it("should reject requests to non-allowed targets", function () {
     process.env.ALLOWED_TARGETS = "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
     
+    // Import config dynamically to get fresh environment values
+    const { config } = require("../src/config");
     const request = createTestRequest("0x9999999999999999999999999999999999999999");
     const result = validateRelayRequest(request, testSignature);
     
@@ -134,6 +149,8 @@ describe("Target Allowlist Validation", function () {
   it("should perform case-insensitive matching", function () {
     process.env.ALLOWED_TARGETS = "0xabcdef1234567890abcdef1234567890abcdef12";
     
+    // Import config dynamically to get fresh environment values
+    const { config } = require("../src/config");
     const request = createTestRequest("0xABCDEF1234567890ABCDEF1234567890ABCDEF12"); // Uppercase
     const result = validateRelayRequest(request, testSignature);
     
@@ -143,6 +160,8 @@ describe("Target Allowlist Validation", function () {
   it("should accept requests when no targets are configured (backward compatibility)", function () {
     // No ALLOWED_TARGETS or EXAMPLE_TARGET_ADDRESS set
     
+    // Import config dynamically to get fresh environment values
+    const { config } = require("../src/config");
     const request = createTestRequest("0x9999999999999999999999999999999999999999");
     const result = validateRelayRequest(request, testSignature);
     

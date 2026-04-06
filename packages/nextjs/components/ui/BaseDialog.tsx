@@ -11,33 +11,37 @@ interface Props {
   disableClose?: boolean;
 }
 
-function BaseDialog({ children, closeDialog, className, open, disableClose }: Props) {
-  const [mounted, setMounted] = useState(false);
+const BaseDialog = React.forwardRef<HTMLDivElement, Props>(
+  ({ children, closeDialog, className, open, disableClose }, ref) => {
+    const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+    useEffect(() => {
+      setMounted(true);
+    }, []);
 
-  if (!mounted || !open) return null;
+    if (!mounted || !open) return null;
 
-  return createPortal(
-    <div className="fixed inset-0 w-screen h-screen bg-black/90 z-50 flex justify-center items-center">
-      <div className={cn("bg-secondary p-6 rounded-lg shadow-lg relative", className)}>
-        <button
-          className={cn(
-            "absolute w-[20px] right-2 text-[20px] font-semibold top-4 cursor-pointer",
-            disableClose && "opacity-50",
-          )}
-          onClick={() => closeDialog()}
-          disabled={disableClose}
-        >
-          <CloseIcon />
-        </button>
-        <div className="w-full h-full">{children}</div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
+    return createPortal(
+      <div className="fixed inset-0 w-screen h-screen bg-black/90 z-50 flex justify-center items-center">
+        <div ref={ref} className={cn("bg-secondary p-6 rounded-lg shadow-lg relative", className)}>
+          <button
+            className={cn(
+              "absolute w-[20px] right-2 text-[20px] font-semibold top-4 cursor-pointer",
+              disableClose && "opacity-50",
+            )}
+            onClick={() => closeDialog()}
+            disabled={disableClose}
+          >
+            <CloseIcon />
+          </button>
+          <div className="w-full h-full">{children}</div>
+        </div>
+      </div>,
+      document.body,
+    ) as React.ReactElement;
+  },
+);
+
+BaseDialog.displayName = "BaseDialog";
 
 export default BaseDialog;
