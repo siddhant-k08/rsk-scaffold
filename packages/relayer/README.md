@@ -150,14 +150,20 @@ Common errors:
 
 For production deployment:
 
-1. Add rate limiting
-2. Implement API authentication
-3. Monitor relayer balance
-4. Set up alerts for low balance
-5. Use a dedicated relayer wallet
-6. Implement request queuing
-7. Add comprehensive logging
-8. Set up metrics and monitoring
+1. **Serve the relayer over HTTPS.** Meta-transaction payloads contain
+   user-signed messages and must not transit the public internet in
+   plaintext. Terminate TLS at a reverse proxy (nginx, Caddy, Cloudflare,
+   etc.) and configure `NEXT_PUBLIC_RELAYER_URL=https://...` on the
+   frontend. The frontend prints a runtime warning when it detects a
+   non-loopback `http://` URL in production.
+2. Add rate limiting
+3. Implement API authentication
+4. Monitor relayer balance
+5. Set up alerts for low balance
+6. Use a dedicated relayer wallet
+7. Implement request queuing
+8. Add comprehensive logging
+9. Set up metrics and monitoring
 
 ## Development
 

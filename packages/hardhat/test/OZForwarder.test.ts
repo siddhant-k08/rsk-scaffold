@@ -3,71 +3,13 @@ import { ethers } from "hardhat";
 import { ExampleTarget } from "../typechain-types";
 import { ERC2771Forwarder } from "../typechain-types/@openzeppelin/contracts/metatx";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { createSignedRequest } from "./helpers/signedRequest";
 
 describe("OpenZeppelin ERC2771Forwarder", function () {
   let forwarder: ERC2771Forwarder;
   let exampleTarget: ExampleTarget;
   let user: SignerWithAddress;
   let relayer: SignerWithAddress;
-
-  // OpenZeppelin EIP712 types - note: nonce is implicit (from contract state)
-  const EIP712_TYPES = {
-    ForwardRequest: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "value", type: "uint256" },
-      { name: "gas", type: "uint256" },
-      { name: "nonce", type: "uint256" }, // Implicit - retrieved from contract
-      { name: "deadline", type: "uint48" }, // Note: uint48 not uint256
-      { name: "data", type: "bytes" },
-    ],
-  };
-
-  // Helper function to create and sign a request with explicit nonce
-  async function createSignedRequest(
-    from: string,
-    to: string,
-    value: bigint,
-    gas: bigint,
-    deadline: number,
-    data: string,
-    signer: SignerWithAddress,
-    explicitNonce?: bigint, // Optional: specify nonce for batch requests
-  ) {
-    const nonce = explicitNonce !== undefined ? explicitNonce : await forwarder.nonces(from);
-
-    // For signing: include nonce
-    const requestToSign = {
-      from,
-      to,
-      value,
-      gas,
-      nonce,
-      deadline,
-      data,
-    };
-
-    const domain = await forwarder.eip712Domain();
-    const domainData = {
-      name: domain.name,
-      version: domain.version,
-      chainId: domain.chainId,
-      verifyingContract: await forwarder.getAddress(),
-    };
-
-    const signature = await signer.signTypedData(domainData, EIP712_TYPES, requestToSign);
-
-    // For execution: no nonce field, includes signature
-    return {
-      from,
-      to,
-      value,
-      gas,
-      deadline,
-      data,
-      signature,
-    };
-  }
 
   beforeEach(async function () {
     const [, userSigner, relayerSigner] = await ethers.getSigners();
@@ -105,6 +47,7 @@ describe("OpenZeppelin ERC2771Forwarder", function () {
       const data = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
 
       const request = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -130,6 +73,7 @@ describe("OpenZeppelin ERC2771Forwarder", function () {
       const data = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
 
       const request = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -174,6 +118,7 @@ describe("OpenZeppelin ERC2771Forwarder", function () {
       const data = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
 
       const request = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -205,6 +150,7 @@ describe("OpenZeppelin ERC2771Forwarder", function () {
 
       // Create first request with explicit nonce
       const request1 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -217,6 +163,7 @@ describe("OpenZeppelin ERC2771Forwarder", function () {
 
       // Create second request with nonce + 1
       const request2 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,

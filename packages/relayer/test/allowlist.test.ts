@@ -1,9 +1,22 @@
 import { expect } from "chai";
-import { validateRelayRequest } from "../src/validator";
 import { ForwardRequest } from "../src/types";
 
-// Mock environment variables for testing
+// Mock environment variables for testing.
+//
+// validator.ts captures `config` at module load via a top-level import,
+// so static-importing `validateRelayRequest` here would freeze it against
+// whatever config was active when this test file was first evaluated.
+// The validator-test blocks below therefore (1) clear BOTH the config and
+// validator caches in beforeEach, and (2) use dynamic require() to pick up
+// the freshly bound `config` reference each test.
 const originalEnv = process.env;
+
+function resetConfigAndValidatorCache() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  delete require.cache[require.resolve("../src/config")];
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  delete require.cache[require.resolve("../src/validator")];
+}
 
 describe("Target Allowlist Configuration", function () {
   beforeEach(function () {
@@ -54,7 +67,7 @@ describe("Target Allowlist Configuration", function () {
     expect(config.allowedTargets).to.have.length(2);
     expect(config.allowedTargets).to.not.include("0x9999999999999999999999999999999999999999");
     expect(config.allowedTargets).to.include("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    expect(config.allowedTargets).to.include("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    expect(config.allowedTargets).to.include("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
   });
 
   it("should handle whitespace correctly", function () {
@@ -99,17 +112,15 @@ describe("Target Allowlist Validation", function () {
     process.env = { ...originalEnv };
     delete process.env.EXAMPLE_TARGET_ADDRESS;
     delete process.env.ALLOWED_TARGETS;
-    
-    // Clear module cache to ensure config is re-read with new environment
-    delete require.cache[require.resolve("../src/config")];
+
+    // Clear BOTH config and validator caches so the validator picks up
+    // the freshly loaded config rather than a stale captured reference.
+    resetConfigAndValidatorCache();
   });
 
   afterEach(function () {
-    // Restore original environment
     process.env = originalEnv;
-    
-    // Clear module cache after test
-    delete require.cache[require.resolve("../src/config")];
+    resetConfigAndValidatorCache();
   });
 
   const createTestRequest = (to: string): ForwardRequest => ({
@@ -123,48 +134,58 @@ describe("Target Allowlist Validation", function () {
 
   const testSignature = "0x" + "a".repeat(130);
 
+  // Dynamic import so each test gets a validator bound to the freshly
+  // loaded config module (after the beforeEach cache reset).
+  function loadValidator(): typeof import("../src/validator").validateRelayRequest {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("../src/validator").validateRelayRequest;
+  }
+
   it("should accept requests to allowed targets", function () {
-    process.env.ALLOWED_TARGETS = "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
-    
-    // Import config dynamically to get fresh environment values
-    const { config } = require("../src/config");
+    process.env.ALLOWED_TARGETS =
+      "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
+
+    const validateRelayRequest = loadValidator();
     const request = createTestRequest("0x1111111111111111111111111111111111111111");
     const result = validateRelayRequest(request, testSignature);
-    
+
     expect(result.valid).to.be.true;
   });
 
   it("should reject requests to non-allowed targets", function () {
-    process.env.ALLOWED_TARGETS = "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
-    
-    // Import config dynamically to get fresh environment values
-    const { config } = require("../src/config");
+    process.env.ALLOWED_TARGETS =
+      "0x1111111111111111111111111111111111111111,0x2222222222222222222222222222222222222222";
+
+    const validateRelayRequest = loadValidator();
     const request = createTestRequest("0x9999999999999999999999999999999999999999");
     const result = validateRelayRequest(request, testSignature);
-    
+
     expect(result.valid).to.be.false;
     expect(result.error).to.equal("Target contract not allowed");
   });
 
   it("should perform case-insensitive matching", function () {
     process.env.ALLOWED_TARGETS = "0xabcdef1234567890abcdef1234567890abcdef12";
-    
-    // Import config dynamically to get fresh environment values
-    const { config } = require("../src/config");
+
+    const validateRelayRequest = loadValidator();
     const request = createTestRequest("0xABCDEF1234567890ABCDEF1234567890ABCDEF12"); // Uppercase
     const result = validateRelayRequest(request, testSignature);
-    
+
     expect(result.valid).to.be.true;
   });
 
-  it("should accept requests when no targets are configured (backward compatibility)", function () {
+  // Documents the explicit fail-closed decision (B-MED-14): an empty
+  // allowlist must reject every request, never accept-by-default. The
+  // previous "backward compatibility" test asserted the opposite and was
+  // only passing in the contributor's environment due to module-load
+  // config caching reading stale state.
+  it("fails closed when no targets are configured (rejects all requests)", function () {
     // No ALLOWED_TARGETS or EXAMPLE_TARGET_ADDRESS set
-    
-    // Import config dynamically to get fresh environment values
-    const { config } = require("../src/config");
+    const validateRelayRequest = loadValidator();
     const request = createTestRequest("0x9999999999999999999999999999999999999999");
     const result = validateRelayRequest(request, testSignature);
-    
-    expect(result.valid).to.be.true;
+
+    expect(result.valid).to.be.false;
+    expect(result.error).to.equal("Target contract not allowed");
   });
 });

@@ -35,14 +35,6 @@ export function getEIP712Domain(chainId: number, verifyingContract: `0x${string}
   };
 }
 
-// Legacy export for backward compatibility (defaults to RSK Testnet)
-export const EIP712_DOMAIN = {
-  name: "RSKForwarder",
-  version: "1", // OpenZeppelin default version
-  chainId: 31,
-  verifyingContract: "" as `0x${string}`,
-};
-
 // OpenZeppelin ERC2771Forwarder EIP712 types
 // Note: nonce is included in signature but not in struct
 export const EIP712_TYPES = {

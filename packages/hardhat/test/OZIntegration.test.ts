@@ -3,6 +3,7 @@ import { ethers } from "hardhat";
 import { ExampleTarget } from "../typechain-types";
 import { ERC2771Forwarder } from "../typechain-types/@openzeppelin/contracts/metatx";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { createSignedRequest } from "./helpers/signedRequest";
 
 describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
   let forwarder: ERC2771Forwarder;
@@ -10,61 +11,6 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
   let user: SignerWithAddress;
   let user2: SignerWithAddress;
   let relayer: SignerWithAddress;
-
-  const EIP712_TYPES = {
-    ForwardRequest: [
-      { name: "from", type: "address" },
-      { name: "to", type: "address" },
-      { name: "value", type: "uint256" },
-      { name: "gas", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "deadline", type: "uint48" },
-      { name: "data", type: "bytes" },
-    ],
-  };
-
-  async function createSignedRequest(
-    from: string,
-    to: string,
-    value: bigint,
-    gas: bigint,
-    deadline: number,
-    data: string,
-    signer: SignerWithAddress,
-    explicitNonce?: bigint,
-  ) {
-    const nonce = explicitNonce !== undefined ? explicitNonce : await forwarder.nonces(from);
-
-    const requestToSign = {
-      from,
-      to,
-      value,
-      gas,
-      nonce,
-      deadline,
-      data,
-    };
-
-    const domain = await forwarder.eip712Domain();
-    const domainData = {
-      name: domain.name,
-      version: domain.version,
-      chainId: domain.chainId,
-      verifyingContract: await forwarder.getAddress(),
-    };
-
-    const signature = await signer.signTypedData(domainData, EIP712_TYPES, requestToSign);
-
-    return {
-      from,
-      to,
-      value,
-      gas,
-      deadline,
-      data,
-      signature,
-    };
-  }
 
   beforeEach(async function () {
     const [, userSigner, user2Signer, relayerSigner] = await ethers.getSigners();
@@ -95,6 +41,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       const data = exampleTarget.interface.encodeFunctionData("addPoints", [25n]);
 
       const request = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -131,6 +78,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < 5; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [5n]);
         const request = await createSignedRequest(
+          forwarder,
           user.address,
           await exampleTarget.getAddress(),
           0n,
@@ -160,6 +108,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const data = exampleTarget.interface.encodeFunctionData("addPoints", [15n]);
       const request = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -190,6 +139,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < 3; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
         const request = await createSignedRequest(
+          forwarder,
           user.address,
           await exampleTarget.getAddress(),
           0n,
@@ -220,6 +170,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       // Create valid and invalid requests
       const data1 = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
       const request1 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -233,6 +184,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       // Invalid request (wrong nonce)
       const data2 = exampleTarget.interface.encodeFunctionData("addPoints", [20n]);
       const request2 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -245,6 +197,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
 
       const data3 = exampleTarget.interface.encodeFunctionData("addPoints", [30n]);
       const request3 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -275,6 +228,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < 3; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [5n]);
         const request = await createSignedRequest(
+          forwarder,
           user.address,
           await exampleTarget.getAddress(),
           0n,
@@ -292,7 +246,8 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       const receipt = await tx.wait();
       const batchGas = receipt?.gasUsed || 0n;
 
-      console.log(`      Batch gas (3 tx): ${batchGas.toString()}`);
+      // Gas figures are surfaced via hardhat-gas-reporter; no console output here.
+      void batchGas;
 
       // Verify execution
       const finalPoints = await exampleTarget.getPoints(user.address);
@@ -307,6 +262,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       // User 1 transaction
       const data1 = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
       const request1 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -319,6 +275,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       // User 2 transaction
       const data2 = exampleTarget.interface.encodeFunctionData("addPoints", [20n]);
       const request2 = await createSignedRequest(
+        forwarder,
         user2.address,
         await exampleTarget.getAddress(),
         0n,
@@ -356,6 +313,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < 2; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [5n]);
         const request = await createSignedRequest(
+          forwarder,
           user.address,
           await exampleTarget.getAddress(),
           0n,
@@ -372,6 +330,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < 2; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
         const request = await createSignedRequest(
+          forwarder,
           user2.address,
           await exampleTarget.getAddress(),
           0n,
@@ -402,6 +361,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       const data = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
 
       const request = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -430,6 +390,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
 
       // User2 signs for user1's transaction
       const request = await createSignedRequest(
+        forwarder,
         user.address, // From user1
         await exampleTarget.getAddress(),
         0n,
@@ -452,6 +413,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       // Create requests with wrong order
       const data1 = exampleTarget.interface.encodeFunctionData("addPoints", [10n]);
       const request1 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -464,6 +426,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
 
       const data2 = exampleTarget.interface.encodeFunctionData("addPoints", [20n]);
       const request2 = await createSignedRequest(
+        forwarder,
         user.address,
         await exampleTarget.getAddress(),
         0n,
@@ -491,6 +454,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < txCount; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [5n]);
         const request = await createSignedRequest(
+          forwarder,
           user.address,
           await exampleTarget.getAddress(),
           0n,
@@ -514,6 +478,7 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       for (let i = 0; i < txCount; i++) {
         const data = exampleTarget.interface.encodeFunctionData("addPoints", [5n]);
         const request = await createSignedRequest(
+          forwarder,
           user3.address,
           await exampleTarget.getAddress(),
           0n,
@@ -530,12 +495,8 @@ describe("Integration: OpenZeppelin Forwarder Full Flow", function () {
       const batchReceipt = await batchTx.wait();
       const batchGas = batchReceipt?.gasUsed || 0n;
 
-      console.log(`      Individual total: ${totalIndividualGas.toString()}`);
-      console.log(`      Batch total: ${batchGas.toString()}`);
-      console.log(
-        `      Savings: ${((Number(totalIndividualGas - batchGas) / Number(totalIndividualGas)) * 100).toFixed(2)}%`,
-      );
-
+      // Gas figures and savings are produced by hardhat-gas-reporter
+      // when REPORT_GAS=true; no console output here.
       expect(batchGas).to.be.lessThan(totalIndividualGas);
     });
   });

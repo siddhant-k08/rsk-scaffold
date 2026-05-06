@@ -16,7 +16,12 @@ export function validateRelayRequest(request: ForwardRequest, signature: string)
     return { valid: false, error: "Invalid 'to' address" };
   }
 
-  // Check if target is in the allowlist
+  // Allowlist enforcement is FAIL-CLOSED: an empty allowlist rejects all
+  // requests rather than accepting them. The relayer pays gas, so an
+  // unconfigured allowlist would let any caller drain the relayer wallet
+  // by forwarding to attacker-chosen contracts. Operators MUST set either
+  // ALLOWED_TARGETS or EXAMPLE_TARGET_ADDRESS in .env (config.ts emits a
+  // startup warning when neither is present).
   const targetLower = request.to.toLowerCase();
   if (!config.allowedTargets.includes(targetLower)) {
     return { valid: false, error: "Target contract not allowed" };
@@ -66,6 +71,6 @@ export function validateRelayRequest(request: ForwardRequest, signature: string)
   return { valid: true };
 }
 
-function isValidAddress(address: string): boolean {
+export function isValidAddress(address: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(address);
 }

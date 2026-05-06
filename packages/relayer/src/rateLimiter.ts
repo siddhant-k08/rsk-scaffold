@@ -1,13 +1,44 @@
 import rateLimit from "express-rate-limit";
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 
-// Rate limiting configuration from environment variables
-const RATE_LIMIT_PER_IP_PER_MIN = parseInt(process.env.RATE_LIMIT_PER_IP_PER_MIN || "20");
-const RATE_LIMIT_PER_IP_PER_HOUR = parseInt(process.env.RATE_LIMIT_PER_IP_PER_HOUR || "100");
-const RATE_LIMIT_PER_ADDRESS_PER_MIN = parseInt(process.env.RATE_LIMIT_PER_ADDRESS_PER_MIN || "10");
-const RATE_LIMIT_PER_ADDRESS_PER_HOUR = parseInt(process.env.RATE_LIMIT_PER_ADDRESS_PER_HOUR || "50");
-const RATE_LIMIT_GLOBAL_CONCURRENT = parseInt(process.env.RATE_LIMIT_GLOBAL_CONCURRENT || "100");
-const DAILY_BUDGET_RBTC = parseFloat(process.env.DAILY_BUDGET_RBTC || "0.1");
+// Rate limiting configuration from environment variables.
+//
+// Hard-fail at startup on malformed values. Without these guards,
+// `RATE_LIMIT_PER_IP_PER_MIN=abc` parses to NaN, which express-rate-limit
+// interprets as 0 and SILENTLY DISABLES the limit — turning a
+// security-critical control off without any log line. Same hazard for
+// the daily budget (parseFloat("abc") -> NaN -> all comparisons false ->
+// budget never tripped).
+function parsePositiveIntEnv(name: string, fallback: string): number {
+  const raw = process.env[name] ?? fallback;
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      `CONFIG ERROR: ${name}="${raw}" is not a positive integer. ` +
+        `Set ${name} to a positive integer (e.g. ${fallback}) or unset it to use the default.`,
+    );
+  }
+  return parsed;
+}
+
+function parsePositiveFloatEnv(name: string, fallback: string): number {
+  const raw = process.env[name] ?? fallback;
+  const parsed = parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(
+      `CONFIG ERROR: ${name}="${raw}" is not a positive number. ` +
+        `Set ${name} to a positive number (e.g. ${fallback}) or unset it to use the default.`,
+    );
+  }
+  return parsed;
+}
+
+const RATE_LIMIT_PER_IP_PER_MIN = parsePositiveIntEnv("RATE_LIMIT_PER_IP_PER_MIN", "20");
+const RATE_LIMIT_PER_IP_PER_HOUR = parsePositiveIntEnv("RATE_LIMIT_PER_IP_PER_HOUR", "100");
+const RATE_LIMIT_PER_ADDRESS_PER_MIN = parsePositiveIntEnv("RATE_LIMIT_PER_ADDRESS_PER_MIN", "10");
+const RATE_LIMIT_PER_ADDRESS_PER_HOUR = parsePositiveIntEnv("RATE_LIMIT_PER_ADDRESS_PER_HOUR", "50");
+const RATE_LIMIT_GLOBAL_CONCURRENT = parsePositiveIntEnv("RATE_LIMIT_GLOBAL_CONCURRENT", "100");
+const DAILY_BUDGET_RBTC = parsePositiveFloatEnv("DAILY_BUDGET_RBTC", "0.1");
 
 // Track per-address request counts and timestamps
 interface AddressRateLimitData {
@@ -36,14 +67,21 @@ function cleanupOldEntries(): void {
   }
   
   keysToDelete.forEach(key => addressLimits.delete(key));
-  
+
   if (keysToDelete.length > 0) {
     // Cleaned up old address rate limit entries
   }
 }
 
-// Start cleanup interval
-setInterval(cleanupOldEntries, CLEANUP_INTERVAL);
+// Start cleanup interval and store the ID for cleanup in test environments
+const cleanupInterval = setInterval(cleanupOldEntries, CLEANUP_INTERVAL);
+
+// Export a cleanup function for test teardown. In production, the interval
+// is intentional and should run for the lifetime of the process. In tests,
+// calling this prevents interval accumulation across test runs.
+export function cleanup(): void {
+  clearInterval(cleanupInterval);
+}
 
 // Daily budget tracking
 interface BudgetTracker {
@@ -78,39 +116,28 @@ export const ipHourlyRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Per-address rate limiter middleware
-export function addressRateLimiter(req: Request, res: Response, next: Function) {
-  const { request, requests } = req.body;
-  const now = Date.now();
-  const oneMinute = 60 * 1000;
-  const oneHour = 60 * 60 * 1000;
-  const cooldown = 1000; // 1 second
+// Per-address rate limiting is split into two phases to prevent a
+// grievance-DoS where an attacker submits invalid requests with a victim's
+// address in the `from` field to exhaust their quota:
+//
+//   1. addressRateLimiter (middleware) — READ-ONLY pre-flight. Rejects if
+//      the claimed `from` is already over its quota, but does NOT increment
+//      counters. Safe to run on unverified input.
+//   2. recordAddressUsage(address) — called from the route handler ONLY
+//      AFTER on-chain signature verification succeeds. This is the only
+//      path that advances counters, so they can only be moved by the true
+//      signer of a valid request.
 
-  // Handle single request (req.body.request)
-  if (request && request.from) {
-    if (!checkAndUpdateAddressLimit(request.from.toLowerCase(), now, cooldown, res)) {
-      return;
-    }
-  }
+const COOLDOWN_MS = 1000; // 1 second between requests for the same address
 
-  // Handle batch requests (req.body.requests array)
-  if (requests && Array.isArray(requests)) {
-    for (const reqItem of requests) {
-      if (reqItem && reqItem.from) {
-        if (!checkAndUpdateAddressLimit(reqItem.from.toLowerCase(), now, cooldown, res)) {
-          return;
-        }
-      }
-    }
-  }
-
-  next();
+interface LimitCheckResult {
+  allowed: boolean;
+  status?: number;
+  error?: string;
 }
 
-// Helper function to check and update address limits
-function checkAndUpdateAddressLimit(address: string, now: number, cooldown: number, res: Response): boolean {
+function ensureAddressData(address: string, now: number): AddressRateLimitData {
   let data = addressLimits.get(address);
-
   if (!data) {
     data = {
       count: 0,
@@ -121,59 +148,97 @@ function checkAndUpdateAddressLimit(address: string, now: number, cooldown: numb
     };
     addressLimits.set(address, data);
   }
-
-  // Reset hourly counter if needed
+  // Reset windows if expired (safe to do on read; rolls over the empty bucket).
   if (now >= data.hourlyResetTime) {
     data.hourlyCount = 0;
     data.hourlyResetTime = now + 60 * 60 * 1000;
   }
-
-  // Reset minute counter if needed
   if (now >= data.minuteResetTime) {
     data.count = 0;
     data.minuteResetTime = now + 60 * 1000;
   }
+  return data;
+}
 
-  // Check cooldown (1 second between requests)
-  if (now - data.lastRequest < cooldown) {
-    res.status(429).json({
-      success: false,
+function checkAddressLimit(address: string, now: number): LimitCheckResult {
+  const data = ensureAddressData(address, now);
+
+  if (data.lastRequest > 0 && now - data.lastRequest < COOLDOWN_MS) {
+    return {
+      allowed: false,
+      status: 429,
       error: "Rate limit exceeded: Please wait 1 second between requests",
-    });
-    return false;
+    };
   }
-
-  // Check per-minute limit (configurable)
   if (data.count >= RATE_LIMIT_PER_ADDRESS_PER_MIN) {
-    res.status(429).json({
-      success: false,
+    return {
+      allowed: false,
+      status: 429,
       error: `Rate limit exceeded: Maximum ${RATE_LIMIT_PER_ADDRESS_PER_MIN} requests per minute per address`,
-    });
-    return false;
+    };
   }
-
-  // Check hourly limit (configurable)
   if (data.hourlyCount >= RATE_LIMIT_PER_ADDRESS_PER_HOUR) {
-    res.status(429).json({
-      success: false,
+    return {
+      allowed: false,
+      status: 429,
       error: `Rate limit exceeded: Maximum ${RATE_LIMIT_PER_ADDRESS_PER_HOUR} requests per hour per address`,
-    });
-    return false;
+    };
   }
+  return { allowed: true };
+}
 
-  // Update counters
+// Public: call AFTER signature verification succeeds. Increments counters
+// for the verified signer. Returns false if the verified signer has, in the
+// meantime, exceeded their limit (concurrent-request race).
+export function recordAddressUsage(address: string): LimitCheckResult {
+  const now = Date.now();
+  const check = checkAddressLimit(address.toLowerCase(), now);
+  if (!check.allowed) return check;
+
+  const data = ensureAddressData(address.toLowerCase(), now);
   data.count++;
   data.hourlyCount++;
   data.lastRequest = now;
+  return { allowed: true };
+}
 
-  return true;
+// Middleware: read-only pre-flight. Rejects requests whose claimed `from`
+// is already over quota (cheap fail-fast) but does NOT mutate counters,
+// so attackers cannot push a victim over quota with unverified requests.
+export function addressRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const body = req.body as { request?: { from?: string }; requests?: Array<{ request?: { from?: string } }> } | undefined;
+  const now = Date.now();
+
+  // Single relay request structure: { request: { from, ... }, signature: ... }
+  if (body?.request && typeof body.request.from === "string") {
+    const result = checkAddressLimit(body.request.from.toLowerCase(), now);
+    if (!result.allowed) {
+      res.status(result.status || 429).json({ success: false, error: result.error });
+      return;
+    }
+  }
+
+  // Batch relay request structure: { requests: [{ request: { from, ... }, signature: ... }], refundReceiver? }
+  if (body?.requests && Array.isArray(body.requests)) {
+    for (const reqItem of body.requests) {
+      if (reqItem?.request && typeof reqItem.request.from === "string") {
+        const result = checkAddressLimit(reqItem.request.from.toLowerCase(), now);
+        if (!result.allowed) {
+          res.status(result.status || 429).json({ success: false, error: result.error });
+          return;
+        }
+      }
+    }
+  }
+
+  next();
 }
 
 // Global concurrent request limiter
 let concurrentRequests = 0;
 const MAX_CONCURRENT_REQUESTS = RATE_LIMIT_GLOBAL_CONCURRENT;
 
-export function concurrentRequestLimiter(req: Request, res: Response, next: Function) {
+export function concurrentRequestLimiter(req: Request, res: Response, next: NextFunction) {
   if (concurrentRequests >= MAX_CONCURRENT_REQUESTS) {
     return res.status(503).json({
       success: false,
@@ -183,10 +248,25 @@ export function concurrentRequestLimiter(req: Request, res: Response, next: Func
 
   concurrentRequests++;
 
-  // Decrease counter when response finishes
-  res.on("finish", () => {
+  // Decrement on whichever lifecycle event arrives first:
+  //   * 'finish' — response fully flushed to the client.
+  //   * 'close'  — connection torn down (client abort, network drop,
+  //                AbortController cancellation, proxy timeout) before
+  //                'finish' fires. Without this branch, aborted requests
+  //                permanently leak a counter slot, and a sustained abort
+  //                storm would peg the limiter at MAX and serve permanent
+  //                503s until process restart.
+  // The `released` guard makes the decrement idempotent so the two events
+  // (which CAN both fire — 'close' is emitted after 'finish' on a normal
+  // response) only decrement once.
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
     concurrentRequests--;
-  });
+  };
+  res.on("finish", release);
+  res.on("close", release);
 
   next();
 }

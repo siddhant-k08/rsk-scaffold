@@ -13,20 +13,33 @@ import "hardhat-deploy-ethers";
 // Get deployer private key from environment variable
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
-// For non-hardhat networks, DEPLOYER_PRIVATE_KEY is required to prevent accidental deployments with default keys
-if (!deployerPrivateKey && process.env.HARDHAT_NETWORK !== "hardhat" && process.env.HARDHAT_NETWORK) {
-  throw new Error("DEPLOYER_PRIVATE_KEY env var is required for non-hardhat networks");
-}
+// Networks that are local-only and may safely run without an explicit
+// DEPLOYER_PRIVATE_KEY (Hardhat ships its own deterministic test accounts).
+const LOCAL_NETWORKS = new Set(["hardhat", "localhost"]);
+const targetNetwork = process.env.HARDHAT_NETWORK;
 
-// Use Hardhat default key only for local hardhat network
-const finalDeployerPrivateKey =
-  deployerPrivateKey || "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+// Hard-fail at config load when targeting any non-local network without
+// DEPLOYER_PRIVATE_KEY. This prevents the previous footgun where a missing
+// env var silently fell back to the universally-known Hardhat account-0
+// key while pointed at a real network.
+if (!deployerPrivateKey && targetNetwork && !LOCAL_NETWORKS.has(targetNetwork)) {
+  throw new Error(
+    `DEPLOYER_PRIVATE_KEY env var is required for network "${targetNetwork}". ` +
+    "Set DEPLOYER_PRIVATE_KEY in packages/hardhat/.env before running this command.",
+  );
+}
 
 // forking rpc url
 const forkingURL = process.env.FORKING_URL || "";
 
 // Rootstock RPC URL from environment variable
 const rootstockRpcUrl = process.env.ROOTSTOCK_RPC_URL || "https://rpc.testnet.rootstock.io";
+
+// Build the accounts list for non-local networks. We DO NOT fall back to
+// the well-known Hardhat key here — if the env var is missing, the network
+// has no signers, so any attempt to deploy/send a tx will fail explicitly
+// rather than silently using a public key.
+const remoteNetworkAccounts: string[] = deployerPrivateKey ? [deployerPrivateKey] : [];
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -62,7 +75,7 @@ const config: HardhatUserConfig = {
     },
     rootstockTestnet: {
       url: rootstockRpcUrl,
-      accounts: [finalDeployerPrivateKey],
+      accounts: remoteNetworkAccounts,
       chainId: 31,
     },
   },
